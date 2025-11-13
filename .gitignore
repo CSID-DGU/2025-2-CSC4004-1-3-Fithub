@@ -1,0 +1,4 @@
+# github token 환경 파일
+.env
+.env.local
+.env.*.local

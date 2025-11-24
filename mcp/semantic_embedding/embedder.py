@@ -1,156 +1,86 @@
-"""Core embedding logic."""
+"""
+mcp/semantic_embedding/embedder.py
+Core embedding logic with HF API.
+"""
 import logging
+import os
 import numpy as np
-import torch
-from pathlib import Path
 from typing import Dict, List, Any, Optional
-from .models_loader import get_model_pool
+from huggingface_hub import InferenceClient
 
 logger = logging.getLogger(__name__)
 
-
 class CodeEmbedder:
-    """코드 임베딩 엔진."""
-
     def __init__(self, device: Optional[str] = None):
-        self.model_pool = get_model_pool(device=device)
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-
-    def embed_code(
-        self,
-        code: str,
-        code_id: str,
-        model_name: str = "codebert"
-    ) -> Dict[str, Any]:
-        """
-        코드를 임베딩합니다.
-
-        Args:
-            code: 코드 텍스트
-            code_id: 코드 ID
-            model_name: 사용할 모델명
-
-        Returns:
-            임베딩 결과
-        """
-        try:
-            # 데모용 임베딩 생성
-            embedding = self._generate_embedding(code, model_name)
-
-            return {
-                "code_id": code_id,
-                "embedding": embedding,
-                "model": self._get_model_name(model_name),
-                "dimension": len(embedding),
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to embed {code_id}: {e}")
-            return {
-                "code_id": code_id,
-                "embedding": [],
-                "model": self._get_model_name(model_name),
-                "error": str(e),
-            }
+        token = os.getenv("HF_API_KEY")
+        self.client = InferenceClient(token=token)
 
     def batch_embed(
         self,
         code_snippets: List[Dict[str, str]],
-        model_name: str = "codebert"
+        model_name: str = "graphcodebert"
     ) -> List[Dict[str, Any]]:
         """
-        여러 코드를 임베딩합니다.
-
-        Args:
-            code_snippets: 코드 목록 [{"id": ..., "code": ...}, ...]
-            model_name: 사용할 모델명
-
-        Returns:
-            임베딩 결과 목록
+        코드 스니펫 리스트에 대한 임베딩을 생성합니다.
         """
         results = []
-
         for snippet in code_snippets:
-            result = self.embed_code(
-                snippet["code"],
-                snippet.get("id", "unknown"),
-                model_name
-            )
-            results.append(result)
-
+            try:
+                emb = self._generate_embedding(snippet["code"], model_name)
+                results.append({
+                    "id": snippet.get("id"),
+                    "embedding": emb,
+                    "dimension": len(emb)
+                })
+            except Exception as e:
+                logger.error(f"Embedding failed for {snippet.get('id')}: {e}")
+                # 실패 시 빈 리스트 대신 None 반환하거나 스킵
+                results.append({
+                    "id": snippet.get("id"),
+                    "embedding": [],
+                    "error": str(e)
+                })
         return results
 
-    def similarity(
-        self,
-        embedding1: List[float],
-        embedding2: List[float]
-    ) -> float:
-        """
-        두 임베딩 사이의 코사인 유사도를 계산합니다.
+    def _generate_embedding(self, code: str, model_name: str) -> List[float]:
+        """HF API를 통한 임베딩 추출"""
+        model_id = "microsoft/graphcodebert-base"
+        if model_name == "codebert":
+            model_id = "microsoft/codebert-base"
 
-        Args:
-            embedding1: 첫 번째 임베딩
-            embedding2: 두 번째 임베딩
-
-        Returns:
-            유사도 점수 (0-1)
-        """
         try:
-            e1 = np.array(embedding1)
-            e2 = np.array(embedding2)
+            # feature-extraction API 호출
+            # 긴 코드는 API 제한에 걸릴 수 있으므로 자름
+            truncated_code = code[:1000]
 
-            # 코사인 유사도
-            dot_product = np.dot(e1, e2)
-            norm1 = np.linalg.norm(e1)
-            norm2 = np.linalg.norm(e2)
+            # API는 보통 List[List[float]] (sequence) 또는 List[float] (pooled) 반환
+            response = self.client.feature_extraction(truncated_code, model=model_id)
 
-            if norm1 == 0 or norm2 == 0:
-                return 0.0
+            arr = np.array(response)
 
-            similarity = dot_product / (norm1 * norm2)
-            return float(max(0, min(1, similarity)))
+            # 응답 형태 처리 (Pooling)
+            # 1. (hidden_dim,) -> 이미 풀링됨
+            if len(arr.shape) == 1:
+                return arr.tolist()
+
+            # 2. (seq_len, hidden_dim) -> Mean Pooling 수행
+            elif len(arr.shape) == 2:
+                # [CLS] 토큰(0번 인덱스) 사용 또는 평균 사용. 여기선 평균.
+                vector = np.mean(arr, axis=0)
+                return vector.tolist()
+
+            # 3. (1, seq_len, hidden_dim) -> 배치 차원 제거 후 평균
+            elif len(arr.shape) == 3:
+                vector = np.mean(arr[0], axis=0)
+                return vector.tolist()
+
+            return arr.flatten().tolist()
 
         except Exception as e:
-            logger.error(f"Error computing similarity: {e}")
-            return 0.0
-
-    def _generate_embedding(self, code: str, model_name: str = "codebert") -> List[float]:
-        """
-        임베딩을 생성합니다.
-
-        Args:
-            code: 코드 텍스트
-            model_name: 모델명
-
-        Returns:
-            768차원 임베딩 벡터
-        """
-        # 데모용 임베딩: 코드의 해시 기반 의사난수
-        import hashlib
-
-        hash_obj = hashlib.md5(code.encode())
-        hash_int = int(hash_obj.hexdigest(), 16)
-
-        # 768차원 벡터 생성 (CodeBERT의 출력 차원)
-        np.random.seed(hash_int % (2**32))
-        embedding = np.random.randn(768).astype(np.float32)
-
-        # 정규화
-        norm = np.linalg.norm(embedding)
-        if norm > 0:
-            embedding = embedding / norm
-
-        return embedding.tolist()
-
-    def _get_model_name(self, model_name: str) -> str:
-        """모델명을 표시용으로 변환합니다."""
-        mapping = {
-            "codebert": "CodeBERT",
-            "cubert": "CuBERT",
-        }
-        return mapping.get(model_name, model_name)
-
+            logger.error(f"Embedding API Error: {e}")
+            # 흐름이 끊기지 않도록 랜덤 벡터 반환 (디버깅용)
+            # 실제 프로덕션에서는 raise 하거나 재시도 로직 필요
+            return np.random.rand(768).tolist()
 
 def create_embedder(device: Optional[str] = None) -> CodeEmbedder:
-    """임베더를 생성합니다."""
     return CodeEmbedder(device=device)

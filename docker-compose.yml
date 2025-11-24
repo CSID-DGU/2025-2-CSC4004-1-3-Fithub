@@ -1,122 +1,27 @@
-version: "3.9"
+version: '3.8'
 
 services:
-  # ==================== MCP Services ====================
+  # ==================== Monolith Lite Agent ====================
+  # 모든 MCP 모듈이 내부적으로 실행되는 단일 에이전트
 
-  summarization-mcp:
-    build:
-      context: .
-      dockerfile: mcp/summarization/Dockerfile
-    container_name: summarization-mcp
-    ports:
-      - "9001:9001"
-    volumes:
-      - ./models/summarization:/models/summarization:ro
-      - ./shared:/app/shared:ro
-    environment:
-      - PYTHONUNBUFFERED=1
-      - DEVICE=cuda  # 또는 cpu
-    depends_on:
-      - agent-service
-    networks:
-      - code-analysis-network
-    restart: unless-stopped
-
-  structural-analysis-mcp:
-    build:
-      context: .
-      dockerfile: mcp/structural_analysis/Dockerfile
-    container_name: structural-analysis-mcp
-    ports:
-      - "9002:9002"
-    volumes:
-      - ./models/structural_analysis:/models/structural_analysis:ro
-      - ./shared:/app/shared:ro
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - code-analysis-network
-    restart: unless-stopped
-
-  semantic-embedding-mcp:
-    build:
-      context: .
-      dockerfile: mcp/semantic_embedding/Dockerfile
-    container_name: semantic-embedding-mcp
-    ports:
-      - "9003:9003"
-    volumes:
-      - ./models/semantic_embedding:/models/semantic_embedding:ro
-      - ./shared:/app/shared:ro
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - code-analysis-network
-    restart: unless-stopped
-
-  repository-analysis-mcp:
-    build:
-      context: .
-      dockerfile: mcp/repository_analysis/Dockerfile
-    container_name: repository-analysis-mcp
-    ports:
-      - "9004:9004"
-    volumes:
-      - ./models/repository_analysis:/models/repository_analysis:ro
-      - ./shared:/app/shared:ro
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - code-analysis-network
-    restart: unless-stopped
-
-  task-recommender-mcp:
-    build:
-      context: .
-      dockerfile: mcp/task_recommender/Dockerfile
-    container_name: task-recommender-mcp
-    ports:
-      - "9005:9005"
-    volumes:
-      - ./models/task_recommender:/models/task_recommender:ro
-      - ./shared:/app/shared:ro
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - code-analysis-network
-    restart: unless-stopped
-
-  # ==================== Agent Service ====================
-
-  agent-service:
+  agent:
     build:
       context: .
       dockerfile: agent/Dockerfile
-    container_name: agent-service
+    container_name: fithub-agent
     ports:
       - "8000:8000"
     volumes:
-      - ./models:/models:ro
-      - ./shared:/app/shared:ro
+      - ./models:/app/models
+      - ./shared:/app/shared
       - /tmp/code_analysis_repos:/tmp/code_analysis_repos
     environment:
       - PYTHONUNBUFFERED=1
       - DEBUG=False
       - HOST=0.0.0.0
       - PORT=8000
-      - SUMMARIZATION_MCP_URL=http://summarization-mcp:9001
-      - STRUCTURAL_ANALYSIS_MCP_URL=http://structural-analysis-mcp:9002
-      - SEMANTIC_EMBEDDING_MCP_URL=http://semantic-embedding-mcp:9003
-      - REPOSITORY_ANALYSIS_MCP_URL=http://repository-analysis-mcp:9004
-      - TASK_RECOMMENDER_MCP_URL=http://task-recommender-mcp:9005
-    depends_on:
-      - summarization-mcp
-      - structural-analysis-mcp
-      - semantic-embedding-mcp
-      - repository-analysis-mcp
-      - task-recommender-mcp
-    networks:
-      - code-analysis-network
+    env_file:
+      - .env
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -124,11 +29,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
-networks:
-  code-analysis-network:
-    driver: bridge
-
-volumes:
-  models:
-    driver: local

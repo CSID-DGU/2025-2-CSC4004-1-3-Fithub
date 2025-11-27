@@ -199,25 +199,41 @@ Repo Analysis가 건축가가 되어 **설계도(Context)**를 그리면, Graph 
 
 ### 2️⃣ **Structural & Embedding MCP** (Local Analysis - Vector)
 
-- **목표:** 코드를 단순 숫자가 아닌 **흐름과 경로가 담긴 고차원 벡터**로 변환.
 
-| 구성 요소 | 사용 모델 | 역할 및 분석 관점 |
-| --- | --- | --- |
-| **Data Flow** | **GraphCodeBERT** | **[변수 흐름]** 변수의 정의-사용(Use-Def) 관계 벡터화. |
-| **Path Context** | **Code2Vec** | **[AST 경로]** 트리 구조를 경로(Path) 단위로 쪼개어 벡터화. |
-| **Raw Parser** | **Tree-sitter** | **[물리적 관계]** Import, Class 상속, 함수 호출 관계 추출. |
-- **📥 Input:** `Source Code`
-- **📤 Output:**
-    
-    ```json
-    {
-      "code_id": "auth_service.py",
-      "fused_vector": [0.12, -0.55, ...], // (Flow + Path 결합 벡터)
-      "raw_edges": [{"target": "db_model.py", "type": "import"}]
-    }
-    
-    ```
-    
+### ✅ 설계 (Actual Implementation)
+
+우리가 작성한 코드(`mcp/structural_analysis/analyzer.py` 등)와 일치하는 정확한 구성입니다.
+
+| 구성 요소 | **사용 모델 / 기술** | 역할 및 분석 관점 | 실제 구현 파일 |
+| :--- | :--- | :--- | :--- |
+| **Semantic & Flow** | **GraphCodeBERT** (via API) | **[의미/흐름 벡터화]** <br>코드의 의미와 데이터 흐름을 768차원 벡터로 변환합니다. | `mcp/semantic_embedding/embedder.py` |
+| **Physical Structure** | **Polyglot Regex Parser** | **[물리적 관계 추출]** <br>정규표현식을 사용하여 함수, 클래스 정의 및 Import 관계(Raw Edges)를 추출합니다. | `mcp/structural_analysis/analyzer.py` |
+| **(Optional) Path** | *(GraphCodeBERT 내장)* | 별도의 AST Linearization 없이, GraphCodeBERT가 학습한 구조적 패턴을 활용합니다. | - |
+
+---
+
+### 📤 수정된 Output JSON (Example)
+
+`Structural Analysis`와 `Embedding`의 결과가 합쳐진 **Fusion 단계**의 데이터 예시입니다.
+
+```json
+{
+  "code_id": "auth_service.py",
+  
+  # 1. GraphCodeBERT가 만든 의미 벡터 (Semantic)
+  "fused_vector": [0.12, -0.55, 0.88, ...], 
+  
+  # 2. Polyglot Regex Parser가 찾은 물리적 연결 (Structural)
+  "raw_edges": [
+    {"source": "auth_service.py", "target": "db_model.py", "type": "imports"},
+    {"source": "auth_service.py", "target": "auth_service.py::login", "type": "defines"}
+  ],
+  
+  # 3. 파서가 찾은 메타데이터
+  "complexity": 15,
+  "language": "Python"
+}
+```
 
 ---
 

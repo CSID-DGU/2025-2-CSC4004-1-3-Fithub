@@ -21,6 +21,24 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Fithub Agent Service")
 
+# CORS Settings
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Allow all origins for now (adjust for production)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.on_event("startup")
+async def startup_event():
+    import os
+    if os.getenv("LANGCHAIN_TRACING_V2") == "true":
+        logger.info("🛠️ LangSmith Tracing is ENABLED.")
+    else:
+        logger.info("LangSmith Tracing is DISABLED.")
+
 # 실행 결과 저장소 (In-Memory Database Substitute)
 # 실제 프로덕션에서는 Redis나 DB를 사용해야 합니다.
 execution_store: Dict[str, Dict[str, Any]] = {}

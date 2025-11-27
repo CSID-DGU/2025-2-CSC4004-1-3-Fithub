@@ -45,6 +45,7 @@ def fuse_data(
 
                 # Structural Info (AST)
                 "complexity": ast_info.get('complexity', 0),
+                "label": ast_info.get('label', node_id.split('/')[-1]),
 
                 # Meta Info (Placeholders for next phases)
                 "quality_score": 0.0,

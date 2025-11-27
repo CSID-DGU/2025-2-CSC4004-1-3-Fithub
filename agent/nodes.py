@@ -27,6 +27,7 @@ async def fetch_from_backend_node(state: AgentState) -> Dict[str, Any]:
     try:
         repo_input = state.get("repo_input", {})
         repo_id = repo_input.get("repo_id", "unknown")
+        local_path = repo_input.get("local_path")
         run_id = state.get("run_id", "default")
 
         # 임시 저장소 경로 설정 및 초기화
@@ -37,19 +38,42 @@ async def fetch_from_backend_node(state: AgentState) -> Dict[str, Any]:
 
         logger.info(f"Fetching files for repo {repo_id} into {temp_dir}...")
 
-        # TODO: 실제 백엔드 연동 시 아래 코드를 활성화하세요.
-        # import httpx
-        # async with httpx.AsyncClient() as client:
-        #     res = await client.get(f"{Config.BACKEND_API_URL}/repos/{repo_id}/files")
-        #     if res.status_code == 200:
-        #         files = res.json()
-        #     else:
-        #         logger.warning(f"Backend fetch failed. Status: {res.status_code}")
-        #         files = _get_mock_files() # Fallback
+        # [Option 1] Local Path Ingestion (For Testing)
+        if local_path:
+            src_path = Path(local_path)
+            if src_path.exists() and src_path.is_dir():
+                logger.info(f"Ingesting from local path: {src_path}")
+                # Copy all files recursively
+                # ignore .git, venv, __pycache__ to avoid clutter
+                shutil.copytree(
+                    src_path, 
+                    temp_dir, 
+                    dirs_exist_ok=True, 
+                    ignore=shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.DS_Store')
+                )
+                log_node_execution(state, "ingest", "success", time.time() - start_time)
+                return {"repo_path": str(temp_dir)}
+            else:
+                logger.warning(f"Provided local_path {local_path} does not exist. Falling back to mock.")
 
-        # [Mock Data for Testing]
-        # 백엔드가 없을 때도 Agent가 동작하는지 확인하기 위함
-        files = _get_mock_files()
+        # [Option 2] Backend API (Production)
+        import httpx
+        try:
+            async with httpx.AsyncClient() as client:
+                # 타임아웃 설정 (대용량 레포지토리 고려)
+                res = await client.get(f"{Config.BACKEND_API_URL}/repos/{repo_id}/files", timeout=60.0)
+                if res.status_code == 200:
+                    files = res.json()
+                    logger.info(f"Successfully fetched {len(files)} files from backend.")
+                else:
+                    logger.warning(f"Backend fetch failed. Status: {res.status_code}. Using mock data.")
+                    files = _get_mock_files() # Fallback
+        except Exception as e:
+            logger.error(f"Backend connection error: {e}. Using mock data.")
+            files = _get_mock_files() # Fallback
+
+        # [Option 3] Mock Data (Removed as default, now fallback)
+        # files = _get_mock_files()
 
         # 파일 시스템에 쓰기
         for f in files:
@@ -92,7 +116,7 @@ async def summarize_node(state: AgentState) -> Dict[str, Any]:
         summ = create_summarizer(device="cpu")
         res = summ.summarize_repository(state["repo_path"])
 
-        summaries = res.get("metadata", {}).get("file_summaries", [])
+        summaries = res.get("file_summaries", [])
         log_node_execution(state, "summarize", "success", time.time() - start_time)
         return {"initial_summaries": summaries}
     except Exception as e:
@@ -153,7 +177,7 @@ async def embed_code_node(state: AgentState) -> Dict[str, Any]:
 
 # ==================== Phase 2: Fusion & Eval ====================
 
-async def fusion_process_node(state: AgentState) -> Dict[str, Any]:
+async def fusion_node(state: AgentState) -> Dict[str, Any]:
     """[Fusion] 데이터 결합"""
     start_time = time.time()
     try:
@@ -219,58 +243,35 @@ async def analyze_repo_node(state: AgentState) -> Dict[str, Any]:
     start_time = time.time()
     try:
         from mcp.repository_analysis.analyzer import create_analyzer
-        anlz = create_analyzer()
-        ctx = anlz.analyze(state.get("fused_data_package", {}))
+        # 1. Repository Analysis (LLM + RepoCoder)
+        analyzer = create_analyzer()
+        analysis_result = analyzer.analyze(state.get("fused_data_package", {}))
 
         log_node_execution(state, "analyze_repo", "success", time.time() - start_time)
-        return {"context_metadata": ctx}
+        return {"context_metadata": analysis_result}
     except Exception as e:
         logger.error(f"Repo analysis error: {e}")
         return {"context_metadata": {}}
 
 async def generate_graph_node(state: AgentState) -> Dict[str, Any]:
-    """[Graph Visual] 시각화 데이터 생성 (NetworkX Layout)"""
+    """[Graph Visual] 시각화 데이터 생성 (Delegates to Visualizer MCP)"""
     start_time = time.time()
     try:
+        from mcp.graph_analysis.visualizer import create_visualizer
+        
         fused = state.get("fused_data_package", {})
         ctx = state.get("context_metadata", {})
+        repo_path = state.get("repo_path") # RepoGraph needs this!
 
         nodes = fused.get("nodes", [])
-        # 물리적 엣지 + 논리적 엣지
-        edges = fused.get("edges", []) + ctx.get("logical_edges", [])
+        edges = fused.get("edges", [])
 
-        # NetworkX로 그래프 구성
-        G = nx.Graph()
-        for n in nodes: G.add_node(n['id'])
-        for e in edges: G.add_edge(e['source'], e['target'])
-
-        # 레이아웃 계산 (좌표 생성)
-        pos = nx.spring_layout(G, k=0.5, iterations=50, seed=42)
-
-        final_nodes = []
-        meta_map = ctx.get("file_metadata", {})
-
-        for n in nodes:
-            nid = n['id']
-            nm = meta_map.get(nid, {})
-
-            # 좌표 및 시각적 속성 주입
-            item = {
-                "id": nid,
-                "label": nid.split('/')[-1], # 파일명만 라벨로
-                "type": n.get("type", "file"),
-                "x": float(pos[nid][0]) * 1000 if nid in pos else 0.0,
-                "y": float(pos[nid][1]) * 1000 if nid in pos else 0.0,
-                "color": "#FF5733" if nm.get("domain_tag") == "Security" else "#3498DB",
-                "size": 60 if nm.get("importance_hint") == "High" else 30,
-                "group": nm.get("layer", "Unknown"),
-                "summary": n.get("summary_text", ""),
-                "icon": "file" # 추후 Code2Vec으로 고도화 가능
-            }
-            final_nodes.append(item)
+        visualizer = create_visualizer()
+        # Visualizer MCP가 RepoGraph 중요도 계산 및 색상/크기 로직을 전담함
+        graph_json = visualizer.build_graph(nodes, edges, ctx, repo_path=repo_path)
 
         log_node_execution(state, "generate_graph", "success", time.time() - start_time)
-        return {"final_graph_json": {"nodes": final_nodes, "edges": edges}}
+        return {"final_graph_json": graph_json}
 
     except Exception as e:
         logger.error(f"Graph gen error: {e}")

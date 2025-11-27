@@ -1,321 +1,201 @@
 """
 mcp/structural_analysis/analyzer.py
-Graph-based structural analysis using Python AST and NetworkX.
-Local model integration for AWS deployment.
+Multi-language Structural Analysis using Robust Regex Patterns.
+Supports: Python, JavaScript, TypeScript, Java, Go, C++
 """
 import logging
-import ast
+import re
 import os
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Set, Tuple
-import networkx as nx
-from collections import defaultdict
+from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-class DependencyVisitor(ast.NodeVisitor):
+class LanguageConfig:
     """
-    AST를 순회하며 함수 정의, 클래스 정의, Import 관계를 추출합니다.
+    언어별 파싱 규칙 정의 (Regex Patterns)
+    Tree-sitter 없이도 주요 구조를 추출하기 위한 경량화된 접근법입니다.
     """
-    def __init__(self, file_id: str):
-        self.file_id = file_id
-        self.nodes = []
-        self.edges = []
+    PATTERNS = {
+        ".py": {
+            "name": "Python",
+            "function": r"def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(",
+            "class": r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[:\(]",
+            "import": r"^(?:import|from)\s+([a-zA-Z0-9_\.]+)"
+        },
+        ".js": {
+            "name": "JavaScript",
+            "function": r"(?:function\s+([a-zA-Z0-9_]+)|const\s+([a-zA-Z0-9_]+)\s*=\s*(?:async\s*)?\(|([a-zA-Z0-9_]+)\s*\([^)]*\)\s*\{)",
+            "class": r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "import": r"(?:import\s+.*?from\s+['\"](.*?)['\"]|require\(['\"](.*?)['\"]\))"
+        },
+        ".ts": {
+            "name": "TypeScript",
+            "function": r"(?:function\s+([a-zA-Z0-9_]+)|const\s+([a-zA-Z0-9_]+)\s*=\s*(?:async\s*)?\(|([a-zA-Z0-9_]+)\s*\(.*?\)\s*[:\{])",
+            "class": r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "import": r"(?:import\s+.*?from\s+['\"](.*?)['\"]|require\(['\"](.*?)['\"]\))"
+        },
+        ".java": {
+            "name": "Java",
+            "function": r"(?:public|protected|private|static|\s) +[\w\<\>\[\]]+\s+([a-zA-Z0-9_]+)\s*\(",
+            "class": r"class\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+            "import": r"import\s+([a-zA-Z0-9_\.]+);"
+        },
+        ".go": {
+            "name": "Go",
+            "function": r"func\s+([a-zA-Z0-9_]+)\s*\(",
+            "class": r"type\s+([a-zA-Z0-9_]+)\s+struct",
+            "import": r"import\s+[\"\(](.*?)[\"\)]"
+        },
+        ".cpp": {
+            "name": "C++",
+            "function": r"\w+\s+([a-zA-Z0-9_]+)\s*\(",
+            "class": r"class\s+([a-zA-Z0-9_]+)",
+            "import": r"#include\s+[<\"](.*?)[>\"]"
+        }
+    }
 
-    def visit_FunctionDef(self, node):
-        func_id = f"{self.file_id}::{node.name}"
-        self.nodes.append({
-            "id": func_id,
-            "type": "function",
-            "label": node.name,
-            "complexity": len(node.body)  # 간단한 복잡도 측정 (Body 길이)
-        })
-        # 파일이 함수를 정의함 (Contains 관계)
-        self.edges.append({
-            "source": self.file_id,
-            "target": func_id,
-            "relation": "defines"
-        })
-        self.generic_visit(node)
+    @staticmethod
+    def get_config(ext: str):
+        return LanguageConfig.PATTERNS.get(ext)
 
-    def visit_ClassDef(self, node):
-        class_id = f"{self.file_id}::{node.name}"
-        self.nodes.append({
-            "id": class_id,
-            "type": "class",
-            "label": node.name
-        })
-        self.edges.append({
-            "source": self.file_id,
-            "target": class_id,
-            "relation": "defines"
-        })
-        self.generic_visit(node)
+class PolyglotParser:
+    """다국어 지원 정규식 파서"""
+    def __init__(self, file_path: str):
+        self.file_path = Path(file_path)
+        self.config = LanguageConfig.get_config(self.file_path.suffix)
+        self.content = ""
 
-    def visit_Import(self, node):
-        for alias in node.names:
-            # 단순화를 위해 모듈명.py를 타겟으로 가정
-            target = alias.name.replace(".", "/") + ".py"
-            self.edges.append({
-                "source": self.file_id,
-                "target": target,
-                "relation": "imports"
+        if self.config:
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    self.content = f.read()
+            except Exception:
+                self.content = ""
+
+    def parse(self, file_id: str) -> Dict[str, List[Dict]]:
+        """노드(함수/클래스)와 엣지(Import/Define) 추출"""
+        if not self.config or not self.content:
+            return {"nodes": [], "edges": []}
+
+        nodes = []
+        edges = []
+
+        # 1. 함수 추출 (Function Definitions)
+        # 정규식은 여러 그룹 중 매칭된 하나를 찾아야 함
+        for match in re.finditer(self.config["function"], self.content, re.MULTILINE):
+            func_name = next((g for g in match.groups() if g), "unknown")
+            func_node_id = f"{file_id}::{func_name}"
+
+            nodes.append({
+                "id": func_node_id,
+                "type": "function",
+                "label": func_name,
+                "language": self.config["name"]
             })
 
-    def visit_ImportFrom(self, node):
-        if node.module:
-            target = node.module.replace(".", "/") + ".py"
-            self.edges.append({
-                "source": self.file_id,
-                "target": target,
-                "relation": "imports"
+            # File defines Function (Contains)
+            edges.append({
+                "source": file_id,
+                "target": func_node_id,
+                "relation": "defines"
             })
 
-class CallGraphVisitor(ast.NodeVisitor):
-    """
-    AST를 순회하며 함수 호출 관계를 추출합니다.
-    """
-    def __init__(self, file_id: str, file_path: str):
-        self.file_id = file_id
-        self.file_path = file_path
-        self.current_scope = None  # 현재 함수/클래스 scope
-        self.calls = []  # (caller, callee) 튜플
-        self.functions = {}  # function_id -> metadata
+        # 2. 클래스 추출 (Class Definitions)
+        for match in re.finditer(self.config["class"], self.content, re.MULTILINE):
+            class_name = next((g for g in match.groups() if g), "unknown")
+            class_node_id = f"{file_id}::{class_name}"
 
-    def visit_FunctionDef(self, node):
-        func_id = f"{self.file_id}::{node.name}"
-        old_scope = self.current_scope
-        self.current_scope = func_id
+            nodes.append({
+                "id": class_node_id,
+                "type": "class",
+                "label": class_name,
+                "language": self.config["name"]
+            })
+            edges.append({
+                "source": file_id,
+                "target": class_node_id,
+                "relation": "defines"
+            })
 
-        # 함수 메타데이터 저장
-        self.functions[func_id] = {
-            "type": "function",
-            "file": self.file_path,
-            "lineno": node.lineno,
-            "complexity": len(node.body)
-        }
+        # 3. Import 추출 (Dependencies)
+        seen_imports = set()
+        for match in re.finditer(self.config["import"], self.content, re.MULTILINE):
+            imp = next((g for g in match.groups() if g), None)
 
-        # 함수 body 순회
-        self.generic_visit(node)
-        self.current_scope = old_scope
+            if imp and imp not in seen_imports:
+                seen_imports.add(imp)
 
-    def visit_ClassDef(self, node):
-        class_id = f"{self.file_id}::{node.name}"
-        old_scope = self.current_scope
-        self.current_scope = class_id
+                # Import 타겟 ID 생성 (단순화: 경로/확장자 추론은 어려우므로 모듈명 사용)
+                # 예: import utils -> utils.py (추정)
+                target_hint = imp.split('.')[-1] + self.file_path.suffix
 
-        # 클래스 메타데이터 저장
-        self.functions[class_id] = {
-            "type": "class",
-            "file": self.file_path,
-            "lineno": node.lineno
-        }
+                edges.append({
+                    "source": file_id,
+                    "target": target_hint, # 나중에 그래프 단계에서 실제 파일 ID와 매칭 시도
+                    "relation": "imports"
+                })
 
-        # 클래스 body 순회
-        self.generic_visit(node)
-        self.current_scope = old_scope
-
-    def visit_Call(self, node):
-        """함수 호출 감지"""
-        if self.current_scope is None:
-            self.generic_visit(node)
-            return
-
-        # 호출되는 함수 이름 추출
-        callee = None
-        if isinstance(node.func, ast.Name):
-            callee = node.func.id
-        elif isinstance(node.func, ast.Attribute):
-            callee = node.func.attr
-
-        if callee:
-            # 간단한 추론: 같은 파일 내 함수면 직접 링크
-            full_callee = f"{self.file_id}::{callee}"
-            self.calls.append((self.current_scope, full_callee))
-
-        self.generic_visit(node)
-
+        return {"nodes": nodes, "edges": edges}
 
 class StructuralAnalyzer:
-    def __init__(self, device: Optional[str] = None):
-        self.device = device
-        self.model_pool = None
-        self._models_initialized = False
-
-    def initialize_models(self) -> None:
-        """
-        로컬 모델들을 초기화합니다.
-        AWS 배포 시 서비스 시작 때 호출됨.
-        """
-        if self._models_initialized:
-            return
-
-        try:
-            # 동적 import로 모델 로더 로드
-            from .models_loader import get_model_pool
-            self.model_pool = get_model_pool(device=self.device)
-            self._models_initialized = True
-            logger.info("✓ StructuralAnalyzer models initialized")
-        except Exception as e:
-            logger.warning(f"Failed to initialize models: {e}. Continuing without model-based analysis.")
-            self._models_initialized = False
-
-    def analyze_file(self, file_path: str) -> Dict[str, Any]:
-        """
-        단일 파일의 구조를 분석합니다.
-
-        Returns:
-            파일 내 함수/클래스/의존성 정보
-        """
-        try:
-            file_path = Path(file_path)
-
-            if not file_path.exists():
-                return {"nodes": [], "edges": [], "error": f"File not found: {file_path}"}
-
-            file_id = file_path.name
-
-            # 파일 노드
-            nodes = [{
-                "id": file_id,
-                "type": "file",
-                "label": file_path.name
-            }]
-
-            # 파일 읽기 및 파싱
-            with open(file_path, "r", encoding="utf-8", errors='ignore') as f:
-                source = f.read()
-
-            tree = ast.parse(source)
-
-            # AST 방문
-            visitor = DependencyVisitor(file_id)
-            visitor.visit(tree)
-
-            nodes.extend(visitor.nodes)
-            edges = visitor.edges
-
-            return {
-                "nodes": nodes,
-                "edges": edges,
-                "statistics": {
-                    "total_nodes": len(nodes),
-                    "total_edges": len(edges)
-                }
-            }
-
-        except Exception as e:
-            logger.error(f"File analysis failed for {file_path}: {e}")
-            return {"nodes": [], "edges": [], "error": str(e)}
+    def __init__(self, device=None):
+        # Lite 모드: 모델 로드 없음
+        pass
 
     def analyze_repository(self, repo_path: str) -> Dict[str, Any]:
         """
-        저장소 전체 구조를 분석합니다.
-        AST 기반으로 노드/엣지 추출
+        저장소 내의 지원되는 모든 언어 파일을 분석합니다.
         """
         try:
             repo_path = Path(repo_path)
             all_nodes = []
             all_edges = []
 
-            # 1. 파일 순회
-            py_files = [
-                p for p in repo_path.rglob("*.py")
-                if not any(part.startswith(".") or part == "venv" for part in p.parts)
+            # 지원하는 확장자 목록
+            valid_exts = set(LanguageConfig.PATTERNS.keys())
+
+            # 1. 파일 검색 (Git, node_modules 등 제외)
+            target_files = [
+                p for p in repo_path.rglob("*")
+                if p.suffix in valid_exts and not any(x in p.parts for x in ["node_modules", ".git", "venv", "dist", "build"])
             ]
 
-            for py_file in py_files:
-                try:
-                    rel_path = str(py_file.relative_to(repo_path))
-                    # Windows 경로 호환성을 위해 역슬래시 변환
-                    file_id = rel_path.replace("\\", "/")
+            logger.info(f"Analyzing structure for {len(target_files)} files...")
 
-                    # 파일 노드 추가
+            for file_path in target_files:
+                try:
+                    # ID 생성 (상대 경로, Windows 역슬래시 처리)
+                    rel_path = str(file_path.relative_to(repo_path)).replace("\\", "/")
+                    file_id = rel_path
+
+                    # 2. 파일 노드 추가
                     all_nodes.append({
                         "id": file_id,
                         "type": "file",
-                        "label": py_file.name
+                        "label": file_path.name,
+                        "language": LanguageConfig.get_config(file_path.suffix)["name"]
                     })
 
-                    with open(py_file, "r", encoding="utf-8", errors='ignore') as f:
-                        source = f.read()
+                    # 3. 내부 구조 파싱 (Polyglot Parser)
+                    parser = PolyglotParser(str(file_path))
+                    result = parser.parse(file_id)
 
-                    tree = ast.parse(source)
+                    all_nodes.extend(result["nodes"])
+                    all_edges.extend(result["edges"])
 
-                    # 2. AST Visitor로 정보 추출
-                    visitor = DependencyVisitor(file_id)
-                    visitor.visit(tree)
-
-                    all_nodes.extend(visitor.nodes)
-                    all_edges.extend(visitor.edges)
-
-                except SyntaxError:
-                    logger.warning(f"Syntax Error parsing {py_file}")
                 except Exception as e:
-                    logger.warning(f"Failed to parse {py_file}: {e}")
+                    logger.warning(f"Parse error {file_path.name}: {e}")
 
             return {
                 "nodes": all_nodes,
                 "edges": all_edges,
-                "statistics": {"total_files": len(py_files)}
+                "statistics": {"total_files": len(target_files)}
             }
 
         except Exception as e:
-            logger.error(f"Repo analysis failed: {e}")
-            return {"nodes": [], "edges": [], "error": str(e)}
+            logger.error(f"Structure analysis failed: {e}")
+            return {"nodes": [], "edges": []}
 
-    def build_call_graph(self, repo_path: str) -> nx.DiGraph:
-        """
-        저장소의 함수 호출 그래프를 생성합니다.
-        NetworkX 기반으로 호출 관계를 나타내는 방향성 그래프를 반환합니다.
-
-        Returns:
-            NetworkX DiGraph (함수 호출 관계)
-        """
-        try:
-            repo_path = Path(repo_path)
-            graph = nx.DiGraph()
-
-            # 모든 Python 파일 순회
-            py_files = [
-                p for p in repo_path.rglob("*.py")
-                if not any(part.startswith(".") or part == "venv" for part in p.parts)
-            ]
-
-            for py_file in py_files:
-                try:
-                    rel_path = str(py_file.relative_to(repo_path))
-                    file_id = rel_path.replace("\\", "/")
-
-                    with open(py_file, "r", encoding="utf-8", errors='ignore') as f:
-                        source = f.read()
-
-                    tree = ast.parse(source)
-
-                    # 호출 그래프 방문자
-                    call_visitor = CallGraphVisitor(file_id, str(py_file))
-                    call_visitor.visit(tree)
-
-                    # 함수/클래스를 노드로 추가
-                    for func_id, metadata in call_visitor.functions.items():
-                        graph.add_node(func_id, **metadata)
-
-                    # 호출 관계를 엣지로 추가
-                    for caller, callee in call_visitor.calls:
-                        if callee in call_visitor.functions:
-                            graph.add_edge(caller, callee, relation="calls")
-
-                except SyntaxError:
-                    logger.warning(f"Syntax Error parsing {py_file}")
-                except Exception as e:
-                    logger.warning(f"Failed to build call graph for {py_file}: {e}")
-
-            logger.info(f"Built call graph with {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges")
-            return graph
-
-        except Exception as e:
-            logger.error(f"Call graph generation failed: {e}")
-            return nx.DiGraph()
-
-def create_analyzer(device: Optional[str] = None) -> StructuralAnalyzer:
-    return StructuralAnalyzer(device=device)
+def create_analyzer(device=None):
+    return StructuralAnalyzer(device)

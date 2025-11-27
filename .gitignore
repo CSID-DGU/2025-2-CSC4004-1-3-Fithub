@@ -90,6 +90,7 @@ models/task_recommender/*
 !models/*/README.md
 
 /tmp/code_analysis_repos/*
+temp_repos/
 *.cache
 
 # Claude Code

@@ -1,105 +1,88 @@
-"""LangGraph workflow definition."""
+"""
+agent/workflow.py
+Modified Monolith Lite Workflow with Backend Ingestion & Context-First Pipeline.
+"""
 import logging
-import asyncio
 from langgraph.graph import StateGraph, END
-from .state import AgentState, create_initial_state
+from .state import AgentState
 from .nodes import (
+    fetch_from_backend_node, # [New] 데이터 수집 (진입점)
     summarize_node,
     build_graph_node,
     embed_code_node,
-    analyze_repo_node,
+    fusion_node,
     evaluate_node,
     refine_node,
+    analyze_repo_node,       # 문맥 분석 (Context)
+    generate_graph_node,     # [New] 그래프 시각화 생성 (Visual)
     synthesize_node,
 )
 from .edges import check_quality
 
 logger = logging.getLogger(__name__)
 
-
 def create_workflow() -> StateGraph:
-    """
-    LangGraph 워크플로우를 생성합니다.
-
-    Returns:
-        컴파일된 워크플로우 그래프
-    """
-    # 1. 상태 그래프 생성
     workflow = StateGraph(AgentState)
 
-    # 2. 노드 추가
+    # 1. 노드 등록
+    # [Phase 0] 데이터 수집 (백엔드 연동)
+    workflow.add_node("ingest", fetch_from_backend_node)
+
+    # [Phase 1] 병렬 분석
     workflow.add_node("summarize", summarize_node)
     workflow.add_node("build_graph", build_graph_node)
     workflow.add_node("embed_code", embed_code_node)
-    workflow.add_node("analyze_repo", analyze_repo_node)
+
+    # [Phase 2] 융합 및 평가
+    workflow.add_node("fusion", fusion_node)
     workflow.add_node("evaluate", evaluate_node)
     workflow.add_node("refine", refine_node)
+
+    # [Phase 3] 문맥 분석 및 시각화 (순차적)
+    workflow.add_node("analyze_repo", analyze_repo_node)     # 태그/레이어 분석
+    workflow.add_node("generate_graph", generate_graph_node) # 좌표/색상 계산 (NetworkX)
+
+    # [Phase 4] 종합
     workflow.add_node("synthesize", synthesize_node)
 
-    # 3. 병렬 진입점 설정
-    # 초기 분석 노드들을 병렬로 실행하기 위해서는 진입 함수 필요
-    def _entry(state: AgentState):
-        """진입점: 상태 반환"""
-        return state
+    # 2. 엣지 연결
+    # 진입점: 백엔드에서 데이터 가져오기
+    workflow.set_entry_point("ingest")
 
-    workflow.add_node("__start__", _entry)
+    # Ingest -> 병렬 실행 시작
+    workflow.add_edge("ingest", "summarize")
+    workflow.add_edge("ingest", "build_graph")
+    workflow.add_edge("ingest", "embed_code")
 
-    # 4. 엣지 연결
-    # 진입점 -> 병렬 분석 노드들
-    workflow.add_edge("__start__", "summarize")
-    workflow.add_edge("__start__", "build_graph")
-    workflow.add_edge("__start__", "embed_code")
-    workflow.add_edge("__start__", "analyze_repo")
+    # 병렬 실행 종료 -> Fusion
+    workflow.add_edge("summarize", "fusion")
+    workflow.add_edge("build_graph", "fusion")
+    workflow.add_edge("embed_code", "fusion")
 
-    # 병렬 노드들 -> 평가 노드 (암묵적으로 병렬 처리됨)
-    workflow.add_edge("summarize", "evaluate")
-    workflow.add_edge("build_graph", "evaluate")
-    workflow.add_edge("embed_code", "evaluate")
-    workflow.add_edge("analyze_repo", "evaluate")
+    # Fusion -> 평가
+    workflow.add_edge("fusion", "evaluate")
 
-    # 5. 조건부 엣지: 평가 후 분기
+    # 평가 분기 (Pass or Refine)
     workflow.add_conditional_edges(
         "evaluate",
         check_quality,
         {
-            "synthesize": "synthesize",
-            "refine": "refine",
+            "pass": "analyze_repo", # 통과 시 문맥 분석으로
+            "refine": "refine",     # 실패 시 재분석
         }
     )
 
-    # 개선 -> 평가 (루프)
-    workflow.add_edge("refine", "evaluate")
+    # 재분석 루프 (옵션만 조정해서 다시 요약/임베딩)
+    workflow.add_edge("refine", "summarize")
+    workflow.add_edge("refine", "embed_code")
 
-    # 종합 -> 끝
+    # 문맥 분석 -> 그래프 생성 -> 종합 -> 끝
+    workflow.add_edge("analyze_repo", "generate_graph")
+    workflow.add_edge("generate_graph", "synthesize")
     workflow.add_edge("synthesize", END)
 
-    # 6. 진입점 설정
-    workflow.set_entry_point("__start__")
-
-    logger.info("Workflow graph created successfully")
-    return workflow
-
-
-def compile_workflow() -> object:
-    """
-    워크플로우를 컴파일합니다.
-
-    Returns:
-        컴파일된 워크플로우 실행기
-    """
-    workflow = create_workflow()
-    app = workflow.compile()
     logger.info("Workflow compiled successfully")
-    return app
-
-
-# 글로벌 워크플로우 앱
-_workflow_app = None
-
+    return workflow.compile() # 바로 컴파일해서 반환
 
 def get_workflow():
-    """글로벌 워크플로우 앱을 가져옵니다."""
-    global _workflow_app
-    if _workflow_app is None:
-        _workflow_app = compile_workflow()
-    return _workflow_app
+    return create_workflow()

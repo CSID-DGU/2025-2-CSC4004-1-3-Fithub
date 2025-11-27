@@ -1,348 +1,305 @@
-"""Node functions for LangGraph workflow."""
+"""
+agent/nodes.py
+Core logic implementation for each workflow node.
+"""
 import logging
-import asyncio
-import httpx
-from typing import Dict, Any
+import time
+import shutil
+import networkx as nx
+import numpy as np
+from pathlib import Path
+from typing import Dict, Any, List
+from sklearn.metrics.pairwise import cosine_similarity
+
 from .state import AgentState, log_node_execution
-from shared.git_utils import clone_repository, load_local_repository, cleanup_repository
 from .config import Config
+from .fusion import fuse_data
 
 logger = logging.getLogger(__name__)
 
+# ==================== Phase 0: Ingestion ====================
+
+async def fetch_from_backend_node(state: AgentState) -> Dict[str, Any]:
+    """
+    [Ingest] 백엔드 API에서 파일 데이터를 받아와 로컬 임시 폴더에 저장합니다.
+    """
+    start_time = time.time()
+    try:
+        repo_input = state.get("repo_input", {})
+        repo_id = repo_input.get("repo_id", "unknown")
+        local_path = repo_input.get("local_path")
+        run_id = state.get("run_id", "default")
+
+        # 임시 저장소 경로 설정 및 초기화
+        temp_dir = Path(Config.TEMP_DIR) / run_id
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Fetching files for repo {repo_id} into {temp_dir}...")
+
+        # [Option 1] Local Path Ingestion (For Testing)
+        if local_path:
+            src_path = Path(local_path)
+            if src_path.exists() and src_path.is_dir():
+                logger.info(f"Ingesting from local path: {src_path}")
+                # Copy all files recursively
+                # ignore .git, venv, __pycache__ to avoid clutter
+                shutil.copytree(
+                    src_path, 
+                    temp_dir, 
+                    dirs_exist_ok=True, 
+                    ignore=shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.DS_Store')
+                )
+                log_node_execution(state, "ingest", "success", time.time() - start_time)
+                return {"repo_path": str(temp_dir)}
+            else:
+                logger.warning(f"Provided local_path {local_path} does not exist. Falling back to mock.")
+
+        # [Option 2] Backend API (Production)
+        import httpx
+        try:
+            async with httpx.AsyncClient() as client:
+                # 타임아웃 설정 (대용량 레포지토리 고려)
+                res = await client.get(f"{Config.BACKEND_API_URL}/repos/{repo_id}/files", timeout=60.0)
+                if res.status_code == 200:
+                    files = res.json()
+                    logger.info(f"Successfully fetched {len(files)} files from backend.")
+                else:
+                    logger.warning(f"Backend fetch failed. Status: {res.status_code}. Using mock data.")
+                    files = _get_mock_files() # Fallback
+        except Exception as e:
+            logger.error(f"Backend connection error: {e}. Using mock data.")
+            files = _get_mock_files() # Fallback
+
+        # [Option 3] Mock Data (Removed as default, now fallback)
+        # files = _get_mock_files()
+
+        # 파일 시스템에 쓰기
+        for f in files:
+            file_path = temp_dir / f['path']
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(file_path, "w", encoding="utf-8") as file:
+                file.write(f['content'])
+
+        log_node_execution(state, "ingest", "success", time.time() - start_time)
+        return {"repo_path": str(temp_dir)}
+
+    except Exception as e:
+        logger.error(f"Ingest failed: {e}")
+        return {"error_message": str(e)}
+
+def _get_mock_files():
+    """테스트용 가상 파일 데이터"""
+    return [
+        {
+            "path": "auth_service.py",
+            "content": "import jwt\ndef login(user, pw):\n    # User authentication logic\n    pass\ndef logout():\n    pass"
+        },
+        {
+            "path": "user_model.py",
+            "content": "class User:\n    def __init__(self, name, email):\n        self.name = name\n        self.email = email"
+        },
+        {
+            "path": "utils.py",
+            "content": "def hash_password(pw):\n    return 'hashed'"
+        }
+    ]
+
+# ==================== Phase 1: Parallel Analysis ====================
 
 async def summarize_node(state: AgentState) -> Dict[str, Any]:
-    """
-    요약 노드: Summarization MCP 호출.
-
-    Args:
-        state: 현재 상태
-
-    Returns:
-        상태 업데이트
-    """
-    import time
+    """[Summarization] CodeT5+를 사용하여 코드 요약"""
+    from mcp.summarization.summarizer import create_summarizer
     start_time = time.time()
-
     try:
-        logger.info("--- Summarize Node ---")
-        repo_path = state.get("repo_path", "")
+        summ = create_summarizer(device="cpu")
+        res = summ.summarize_repository(state["repo_path"])
 
-        # Summarization MCP 호출
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{Config.SUMMARIZATION_MCP_URL}/summarize-repository",
-                json={"repo_path": repo_path, "max_files": 10},
-            )
-            response.raise_for_status()
-            result = response.json()
-
-        summaries = [
-            {
-                "code_id": s["code_id"],
-                "level": s["level"],
-                "text": s["text"],
-                "model": s["model"],
-                "confidence": s.get("confidence", 0.0),
-            }
-            for s in result.get("summaries", [])
-        ]
-
-        duration = time.time() - start_time
-        log_node_execution(state, "summarize_node", "success", duration)
-
+        summaries = res.get("file_summaries", [])
+        log_node_execution(state, "summarize", "success", time.time() - start_time)
         return {"initial_summaries": summaries}
-
     except Exception as e:
-        logger.error(f"Summarization failed: {e}")
-        duration = time.time() - start_time
-        log_node_execution(state, "summarize_node", "error", duration, {"error": str(e)})
-        return {
-            "initial_summaries": [],
-            "error_message": f"Summarization failed: {str(e)}"
-        }
-
+        logger.error(f"Summarize error: {e}")
+        return {"initial_summaries": [], "error_message": str(e)}
 
 async def build_graph_node(state: AgentState) -> Dict[str, Any]:
-    """
-    그래프 구축 노드: Structural Analysis MCP 호출.
-
-    Args:
-        state: 현재 상태
-
-    Returns:
-        상태 업데이트
-    """
-    import time
+    """[Structural] AST 파싱을 통한 의존성 추출"""
+    from mcp.structural_analysis.analyzer import create_analyzer
     start_time = time.time()
-
     try:
-        logger.info("--- Build Graph Node ---")
-        repo_path = state.get("repo_path", "")
-
-        # Structural Analysis MCP 호출
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{Config.STRUCTURAL_ANALYSIS_MCP_URL}/analyze-repository",
-                json={"repo_path": repo_path},
-            )
-            response.raise_for_status()
-            result = response.json()
-
-        graph = {
-            "nodes": result.get("nodes", []),
-            "edges": result.get("edges", []),
-            "statistics": result.get("statistics", {}),
-        }
-
-        duration = time.time() - start_time
-        log_node_execution(state, "build_graph_node", "success", duration)
-
-        return {"code_graph": graph}
-
+        anlz = create_analyzer(device="cpu")
+        res = anlz.analyze_repository(state["repo_path"])
+        log_node_execution(state, "build_graph", "success", time.time() - start_time)
+        return {"code_graph_raw": res}
     except Exception as e:
-        logger.error(f"Graph building failed: {e}")
-        duration = time.time() - start_time
-        log_node_execution(state, "build_graph_node", "error", duration, {"error": str(e)})
-        return {
-            "code_graph": {"nodes": [], "edges": []},
-            "error_message": f"Graph building failed: {str(e)}"
-        }
-
+        return {"code_graph_raw": {}}
 
 async def embed_code_node(state: AgentState) -> Dict[str, Any]:
-    """
-    임베딩 노드: Semantic Embedding MCP 호출.
-
-    Args:
-        state: 현재 상태
-
-    Returns:
-        상태 업데이트
-    """
-    import time
+    """[Embedding] GraphCodeBERT를 사용하여 벡터화"""
+    from mcp.semantic_embedding.embedder import create_embedder
     start_time = time.time()
-
     try:
-        logger.info("--- Embed Code Node ---")
+        embedder = create_embedder(device="cpu")
+        repo_path = Path(state.get("repo_path"))
+        snippets = []
 
-        summaries = state.get("initial_summaries", [])
-        if not summaries:
-            logger.info("No summaries to embed")
+        # 실제 파일 읽기 (최대 20개 제한)
+        py_files = list(repo_path.rglob("*.py"))[:20]
+        for py_file in py_files:
+            try:
+                with open(py_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    code = f.read()[:1000] # 너무 긴 코드는 자름
+                    snippets.append({
+                        "id": str(py_file.relative_to(repo_path)).replace("\\", "/"),
+                        "code": code
+                    })
+            except Exception:
+                continue
+
+        if not snippets:
             return {"embeddings": []}
 
-        # Semantic Embedding MCP 호출
-        snippets = [
-            {"id": s["code_id"], "code": s["text"][:500]}  # 처음 500자만
-            for s in summaries[:5]
-        ]
+        # API 호출
+        results = embedder.batch_embed(snippets, model_name="graphcodebert")
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{Config.SEMANTIC_EMBEDDING_MCP_URL}/batch-embed",
-                json={"snippets": snippets},
-            )
-            response.raise_for_status()
-            embeddings = response.json()
+        # 결과 포맷팅
+        embeddings = []
+        for r in results:
+            if r.get("embedding"):
+                embeddings.append({"id": r["id"], "embedding": r["embedding"]})
 
-        duration = time.time() - start_time
-        log_node_execution(state, "embed_code_node", "success", duration)
-
+        log_node_execution(state, "embed_code", "success", time.time() - start_time)
         return {"embeddings": embeddings}
-
     except Exception as e:
-        logger.error(f"Embedding failed: {e}")
-        duration = time.time() - start_time
-        log_node_execution(state, "embed_code_node", "error", duration, {"error": str(e)})
+        logger.error(f"Embed error: {e}")
         return {"embeddings": []}
 
+# ==================== Phase 2: Fusion & Eval ====================
 
-async def analyze_repo_node(state: AgentState) -> Dict[str, Any]:
-    """
-    저장소 분석 노드: Repository Analysis MCP 호출.
-
-    Args:
-        state: 현재 상태
-
-    Returns:
-        상태 업데이트
-    """
-    import time
+async def fusion_node(state: AgentState) -> Dict[str, Any]:
+    """[Fusion] 데이터 결합"""
     start_time = time.time()
-
     try:
-        logger.info("--- Analyze Repository Node ---")
-        repo_path = state.get("repo_path", "")
-
-        # Repository Analysis MCP 호출
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{Config.REPOSITORY_ANALYSIS_MCP_URL}/analyze",
-                json={"repo_path": repo_path},
-            )
-            response.raise_for_status()
-            result = response.json()
-
-        repo_info = {
-            "repository": result.get("repository"),
-            "overview": result.get("overview"),
-            "statistics": result.get("statistics"),
-            "structure": result.get("structure"),
-        }
-
-        duration = time.time() - start_time
-        log_node_execution(state, "analyze_repo_node", "success", duration)
-
-        return {"repository_info": repo_info}
-
+        fused = fuse_data(
+            state.get("initial_summaries", []),
+            state.get("embeddings", []),
+            state.get("code_graph_raw", {})
+        )
+        log_node_execution(state, "fusion", "success", time.time() - start_time)
+        return {"fused_data_package": fused}
     except Exception as e:
-        logger.error(f"Repository analysis failed: {e}")
-        duration = time.time() - start_time
-        log_node_execution(state, "analyze_repo_node", "error", duration, {"error": str(e)})
-        return {"repository_info": {}}
-
+        logger.error(f"Fusion error: {e}")
+        return {"error_message": str(e)}
 
 async def evaluate_node(state: AgentState) -> Dict[str, Any]:
-    """
-    평가 노드: 품질 메트릭 계산.
-
-    Args:
-        state: 현재 상태
-
-    Returns:
-        상태 업데이트
-    """
-    import time
+    """[Quality Gate] 벡터 일관성 평가"""
     start_time = time.time()
-
     try:
-        logger.info("--- Evaluate Node ---")
+        fused_data = state.get("fused_data_package", {})
+        nodes = fused_data.get("nodes", [])
 
-        # 데모용 메트릭 생성
-        summaries = state.get("refined_summaries") or state.get("initial_summaries", [])
+        # 임베딩 유틸 재사용
+        from mcp.semantic_embedding.embedder import create_embedder
+        embedder = create_embedder(device="cpu")
 
-        metrics = {
-            "codebleu": 0.55 + (0.05 * state.get("retry_count", 0)),  # 재시도할수록 증가
-            "bleurt": 0.15,
-            "bleu4": 0.45,
-            "rougeL": 0.35 + (0.05 * state.get("retry_count", 0)),
-            "edge_f1": 0.85,
-            "ged": 35.0,
-            "ssi": 0.70,
-        }
+        total_sim = 0
+        count = 0
 
-        logger.info(f"Metrics: {metrics}")
+        for node in nodes:
+            summary = node.get("summary_text", "")
+            code_vec = node.get("embedding", [])
 
-        duration = time.time() - start_time
-        log_node_execution(state, "evaluate_node", "success", duration, {"metrics": metrics})
+            # 요약문과 코드가 모두 있는 경우만 평가
+            if summary and code_vec and len(summary) > 5:
+                # 요약문 벡터화
+                sum_vec = embedder._generate_embedding(summary, "graphcodebert")
+                # 코사인 유사도 계산
+                sim = cosine_similarity([code_vec], [sum_vec])[0][0]
 
-        return {"metrics": metrics}
+                node['quality_score'] = float(sim)
+                total_sim += sim
+                count += 1
+            else:
+                node['quality_score'] = 0.5 # 기본값
+
+        avg_score = total_sim / count if count > 0 else 0.6 # 기본값 0.6
+
+        log_node_execution(state, "evaluate", "success", time.time() - start_time)
+        return {"metrics": {"consistency_score": avg_score}, "fused_data_package": fused_data}
 
     except Exception as e:
-        logger.error(f"Evaluation failed: {e}")
-        duration = time.time() - start_time
-        log_node_execution(state, "evaluate_node", "error", duration, {"error": str(e)})
-        return {
-            "metrics": {
-                "codebleu": 0.0,
-                "bleurt": 0.0,
-                "bleu4": 0.0,
-                "rougeL": 0.0,
-                "edge_f1": 0.0,
-                "ged": 100.0,
-                "ssi": 0.0,
-            }
-        }
-
+        logger.error(f"Evaluate error: {e}")
+        return {"metrics": {"consistency_score": 0.0}}
 
 async def refine_node(state: AgentState) -> Dict[str, Any]:
-    """
-    개선 노드: 요약 재생성.
+    """[Refine] 재시도 횟수 증가"""
+    return {"retry_count": state.get("retry_count", 0) + 1}
 
-    Args:
-        state: 현재 상태
+# ==================== Phase 3: Context & Visual ====================
 
-    Returns:
-        상태 업데이트
-    """
-    import time
+async def analyze_repo_node(state: AgentState) -> Dict[str, Any]:
+    """[Repo Analysis] 문맥 태깅 및 계층 분석"""
     start_time = time.time()
-
     try:
-        logger.info(f"--- Refine Node (Attempt {state.get('retry_count', 0) + 1}) ---")
+        from mcp.repository_analysis.analyzer import create_analyzer
+        # 1. Repository Analysis (LLM + RepoCoder)
+        analyzer = create_analyzer()
+        analysis_result = analyzer.analyze(state.get("fused_data_package", {}))
 
-        # 초기 요약 다시 사용 (실제로는 다른 모델 또는 프롬프트 사용)
-        summaries = state.get("initial_summaries", [])
+        log_node_execution(state, "analyze_repo", "success", time.time() - start_time)
+        return {"context_metadata": analysis_result}
+    except Exception as e:
+        logger.error(f"Repo analysis error: {e}")
+        return {"context_metadata": {}}
 
-        duration = time.time() - start_time
-        log_node_execution(state, "refine_node", "success", duration)
+async def generate_graph_node(state: AgentState) -> Dict[str, Any]:
+    """[Graph Visual] 시각화 데이터 생성 (Delegates to Visualizer MCP)"""
+    start_time = time.time()
+    try:
+        from mcp.graph_analysis.visualizer import create_visualizer
+        
+        fused = state.get("fused_data_package", {})
+        ctx = state.get("context_metadata", {})
+        repo_path = state.get("repo_path") # RepoGraph needs this!
 
-        return {
-            "refined_summaries": summaries,
-            "retry_count": state.get("retry_count", 0) + 1,
-        }
+        nodes = fused.get("nodes", [])
+        edges = fused.get("edges", [])
+
+        visualizer = create_visualizer()
+        # Visualizer MCP가 RepoGraph 중요도 계산 및 색상/크기 로직을 전담함
+        graph_json = visualizer.build_graph(nodes, edges, ctx, repo_path=repo_path)
+
+        log_node_execution(state, "generate_graph", "success", time.time() - start_time)
+        return {"final_graph_json": graph_json}
 
     except Exception as e:
-        logger.error(f"Refinement failed: {e}")
-        duration = time.time() - start_time
-        log_node_execution(state, "refine_node", "error", duration, {"error": str(e)})
-        return {"retry_count": state.get("retry_count", 0) + 1}
-
+        logger.error(f"Graph gen error: {e}")
+        return {"final_graph_json": {"nodes": [], "edges": []}}
 
 async def synthesize_node(state: AgentState) -> Dict[str, Any]:
-    """
-    종합 노드: 최종 결과물 종합.
-
-    Args:
-        state: 현재 상태
-
-    Returns:
-        상태 업데이트
-    """
-    import time
+    """[Synthesis] 최종 결과 조립"""
     start_time = time.time()
-
     try:
-        logger.info("--- Synthesize Node ---")
+        from mcp.task_recommender.recommender import create_recommender
+        rec = create_recommender()
 
-        # 최종 요약 선택
-        final_summaries = state.get("refined_summaries") or state.get("initial_summaries", [])
-
-        # 추천 생성 (Task Recommender 호출)
-        try:
-            analysis_results = {
-                "graph": state.get("code_graph", {}),
-                "summaries": final_summaries,
-                "metrics": state.get("metrics", {}),
-            }
-
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    f"{Config.TASK_RECOMMENDER_MCP_URL}/recommend",
-                    json={"analysis_results": analysis_results, "top_k": 10},
-                )
-                response.raise_for_status()
-                rec_result = response.json()
-
-            recommendations = rec_result.get("recommendations", [])
-
-        except Exception as e:
-            logger.warning(f"Failed to get recommendations: {e}")
-            recommendations = []
-
-        duration = time.time() - start_time
-        log_node_execution(state, "synthesize_node", "success", duration)
-
-        return {
-            "final_summaries": final_summaries,
-            "recommendations": recommendations,
-            "status": "completed",
+        analysis_res = {
+            "graph": state.get("final_graph_json"),
+            "context": state.get("context_metadata")
         }
+        tasks = rec.recommend(analysis_res)
+
+        final_artifact = {
+            "graph": state.get("final_graph_json"),
+            "context": state.get("context_metadata"),
+            "recommendations": tasks,
+            "metrics": state.get("metrics")
+        }
+
+        log_node_execution(state, "synthesize", "success", time.time() - start_time)
+        return {"final_artifact": final_artifact, "status": "completed"}
 
     except Exception as e:
-        logger.error(f"Synthesis failed: {e}")
-        duration = time.time() - start_time
-        log_node_execution(state, "synthesize_node", "error", duration, {"error": str(e)})
-        return {
-            "status": "completed",
-            "error_message": f"Synthesis failed: {str(e)}"
-        }
+        logger.error(f"Synthesis error: {e}")
+        return {"status": "failed", "error_message": str(e)}

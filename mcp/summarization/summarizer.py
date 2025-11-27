@@ -1,271 +1,245 @@
-"""Core summarization logic."""
+"""
+mcp/summarization/summarizer.py
+Core summarization logic with Hugging Face API support (Polyglot).
+"""
 import logging
-import torch
+import os
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-from shared.ast_utils import CodeAnalyzer
-from .models_loader import get_model_pool
+from typing import Dict, Any, List, Optional
+from huggingface_hub import InferenceClient
+from agent.config import Config
 
 logger = logging.getLogger(__name__)
 
-
 class CodeSummarizer:
-    """코드 요약 엔진."""
-
     def __init__(self, device: Optional[str] = None):
-        self.model_pool = get_model_pool(device=device)
-        self.analyzer = CodeAnalyzer()
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        token = Config.HF_API_KEY
+        if not token:
+            logger.warning("HF_API_KEY is missing via Config.")
 
-    def summarize_function(
-        self,
-        code: str,
-        function_name: str,
-        file_path: str,
-        model_name: str = "codet5"
-    ) -> Dict[str, Any]:
-        """
-        함수를 요약합니다.
+        self.client = InferenceClient(token=token)
+        self.model_id = Config.MODEL_SUMMARIZER
 
-        Args:
-            code: 함수 코드
-            function_name: 함수 이름
-            file_path: 파일 경로
-            model_name: 사용할 모델명
+        # 3개 Expert 모델 ID
+        self.model_logic = Config.MODEL_SUMMARIZER_LOGIC
+        self.model_intent = Config.MODEL_SUMMARIZER_INTENT
+        self.model_structure = Config.MODEL_SUMMARIZER_STRUCTURE
 
-        Returns:
-            요약 결과
-        """
-        code_id = f"{file_path}:{function_name}"
+        # 지원 확장자 (Polyglot)
+        self.valid_exts = {'.py', '.js', '.ts', '.java', '.go', '.cpp', '.c', '.cs', '.rs'}
 
+    def summarize_file(self, file_path: str, model_name: str = None) -> Dict[str, Any]:
+        """단일 파일 요약"""
+        target_model = self.model_id
         try:
-            # 간단한 요약 생성 (데모용 - 실제로는 모델에서)
-            summary = self._generate_summary(code, model_name)
-
-            return {
-                "code_id": code_id,
-                "level": "function",
-                "text": summary,
-                "model": self._get_model_display_name(model_name),
-                "confidence": 0.85,
-                "metadata": {
-                    "file": file_path,
-                    "name": function_name,
-                }
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to summarize {code_id}: {e}")
-            return {
-                "code_id": code_id,
-                "level": "function",
-                "text": f"Error summarizing function: {str(e)}",
-                "model": self._get_model_display_name(model_name),
-                "confidence": 0.0,
-                "error": str(e),
-            }
-
-    def summarize_class(
-        self,
-        code: str,
-        class_name: str,
-        file_path: str,
-        model_name: str = "codet5"
-    ) -> Dict[str, Any]:
-        """
-        클래스를 요약합니다.
-
-        Args:
-            code: 클래스 코드
-            class_name: 클래스 이름
-            file_path: 파일 경로
-            model_name: 사용할 모델명
-
-        Returns:
-            요약 결과
-        """
-        code_id = f"{file_path}:{class_name}"
-
-        try:
-            summary = self._generate_summary(code, model_name)
-
-            return {
-                "code_id": code_id,
-                "level": "class",
-                "text": summary,
-                "model": self._get_model_display_name(model_name),
-                "confidence": 0.85,
-                "metadata": {
-                    "file": file_path,
-                    "name": class_name,
-                }
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to summarize {code_id}: {e}")
-            return {
-                "code_id": code_id,
-                "level": "class",
-                "text": f"Error summarizing class: {str(e)}",
-                "model": self._get_model_display_name(model_name),
-                "confidence": 0.0,
-                "error": str(e),
-            }
-
-    def summarize_file(
-        self,
-        file_path: str,
-        model_name: str = "starcoder2"
-    ) -> Dict[str, Any]:
-        """
-        파일을 요약합니다.
-
-        Args:
-            file_path: 파일 경로
-            model_name: 사용할 모델명 (기본: 장문 특화)
-
-        Returns:
-            요약 결과
-        """
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 code = f.read()
 
-            summary = self._generate_summary(code[:2000], model_name)  # 처음 2000자만
+            summary = self._generate_summary(code, target_model)
 
             return {
-                "code_id": file_path,
-                "level": "file",
+                "code_id": Path(file_path).name,
                 "text": summary,
-                "model": self._get_model_display_name(model_name),
-                "confidence": 0.80,
-                "metadata": {
-                    "file": file_path,
-                    "lines": len(code.split('\n')),
-                }
-            }
-
-        except Exception as e:
-            logger.error(f"Failed to summarize {file_path}: {e}")
-            return {
-                "code_id": file_path,
                 "level": "file",
-                "text": f"Error summarizing file: {str(e)}",
-                "model": self._get_model_display_name(model_name),
-                "confidence": 0.0,
-                "error": str(e),
+                "model": target_model,
+                "confidence": 0.85
             }
+        except Exception as e:
+            logger.error(f"File summary failed: {e}")
+            return {"error": str(e)}
 
-    def summarize_repository(
-        self,
-        repo_path: str,
-        max_files: int = 10
-    ) -> Dict[str, Any]:
-        """
-        저장소를 요약합니다.
+    def summarize_code(self, code: str, code_id: str, model_name: str = None) -> Dict[str, Any]:
+        """코드 조각 요약"""
+        target_model = self.model_id
+        summary = self._generate_summary(code, target_model)
+        return {
+            "code_id": code_id,
+            "text": summary,
+            "level": "snippet",
+            "model": target_model,
+            "confidence": 0.85
+        }
 
-        Args:
-            repo_path: 저장소 경로
-            max_files: 분석할 최대 파일 수
-
-        Returns:
-            저장소 요약 결과
-        """
+    def summarize_repository(self, repo_path: str, max_files: int = 20) -> Dict[str, Any]:
+        """저장소 전체 앙상블 요약 (다국어 지원)"""
         try:
             repo_path = Path(repo_path)
+            target_files = []
 
-            # Python 파일 찾기
-            py_files = list(repo_path.rglob("*.py"))[:max_files]
+            # 파일 검색
+            for root, dirs, files in os.walk(repo_path):
+                # 불필요한 디렉토리 제외
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in {'venv', 'node_modules', 'dist', 'build', '.git'}]
+                for file in files:
+                    if Path(file).suffix in self.valid_exts:
+                        target_files.append(Path(root) / file)
 
-            if not py_files:
-                return {
-                    "code_id": str(repo_path),
-                    "level": "repo",
-                    "text": "No Python files found in repository",
-                    "model": "CodeT5+",
-                    "confidence": 0.5,
-                }
+            # 파일 수 제한
+            target_files = target_files[:max_files]
+            file_summaries = []
 
-            # 각 파일 분석
-            summaries = []
-            for py_file in py_files:
-                rel_path = str(py_file.relative_to(repo_path))
-                file_summary = self.summarize_file(str(py_file))
-                summaries.append(file_summary)
+            logger.info(f"Ensemble summarizing {len(target_files)} files in {repo_path}")
 
-            # 저장소 전체 요약 생성
-            combined_text = "\n".join([s["text"] for s in summaries[:3]])  # 상위 3개
-            repo_summary = f"Repository Overview:\n{combined_text}"
+            for file_path in target_files:
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        code = f.read()
+
+                    # 상대 경로 ID
+                    code_id = str(file_path.relative_to(repo_path)).replace("\\", "/")
+
+                    # ★ 앙상블 호출 (기존 단일 호출 대체)
+                    ensemble_result = self._generate_ensemble_summary(code[:2000], code_id)
+
+                    file_summaries.append(ensemble_result)
+
+                except Exception as e:
+                    logger.warning(f"Failed to summarize {file_path}: {e}")
 
             return {
-                "code_id": str(repo_path),
-                "level": "repo",
-                "text": repo_summary,
-                "model": "CodeT5+",
-                "confidence": 0.75,
+                "summary": f"Ensemble analyzed {len(file_summaries)} files.",
+                "file_summaries": file_summaries,
                 "metadata": {
-                    "files_analyzed": len(summaries),
-                    "total_files": len(py_files),
-                }
+                    "total_files": len(target_files),
+                    "ensemble_mode": True
+                },
+                "statistics": {"total_files": len(target_files)}
+            }
+        except Exception as e:
+            logger.error(f"Repo summary failed: {e}")
+            return {"error": str(e)}
+
+    def _generate_ensemble_summary(self, code: str, code_id: str) -> Dict[str, Any]:
+        """3개 모델 앙상블 요약 생성"""
+        try:
+            # 1. 3개 Expert 호출 (각각 다른 관점)
+            logic_summary = self._generate_summary(
+                code,
+                self.model_logic,
+                prompt_type="logic"
+            )
+
+            intent_summary = self._generate_summary(
+                code,
+                self.model_intent,
+                prompt_type="intent"
+            )
+
+            structure_summary = self._generate_summary(
+                code,
+                self.model_structure,
+                prompt_type="structure"
+            )
+
+            # 2. 통합
+            unified = self._integrate_summaries(logic_summary, intent_summary, structure_summary)
+
+            # 3. 품질 점수 계산
+            quality = self._calculate_quality(logic_summary, intent_summary, structure_summary)
+
+            # 4. 결과 반환
+            return {
+                "code_id": code_id,
+                "text": unified,  # 호환성을 위해 "text" 키도 포함
+                "unified_summary": unified,
+                "expert_views": {
+                    "logic": logic_summary,
+                    "intent": intent_summary,
+                    "structure": structure_summary
+                },
+                "quality_score": quality,
+                "level": "file"
             }
 
         except Exception as e:
-            logger.error(f"Failed to summarize repository {repo_path}: {e}")
+            logger.error(f"Ensemble summary failed for {code_id}: {e}")
+            # 폴백: 단일 모델 사용
+            fallback = self._generate_summary(code, self.model_logic)
             return {
-                "code_id": str(repo_path),
-                "level": "repo",
-                "text": f"Error summarizing repository: {str(e)}",
-                "model": "CodeT5+",
-                "confidence": 0.0,
-                "error": str(e),
+                "code_id": code_id,
+                "text": fallback,
+                "unified_summary": fallback,
+                "quality_score": 0.5,
+                "level": "file"
             }
 
-    def _generate_summary(self, code: str, model_name: str = "codet5") -> str:
-        """
-        모델을 사용하여 요약을 생성합니다.
-
-        Args:
-            code: 코드 스니펫
-            model_name: 모델명
-
-        Returns:
-            생성된 요약
-        """
-        # 주의: 이 메서드는 데모용입니다.
-        # 실제 구현에서는 모델을 로드하고 추론을 실행합니다.
-
-        # 코드 길이에 따라 기본 요약 생성
-        lines = code.split('\n')
-
-        # 간단한 휴리스틱 기반 요약
-        if "def " in code or "class " in code:
-            summary = "This code defines a Python function or class. "
-        else:
-            summary = "This code snippet contains Python logic. "
-
-        # 주요 키워드 추출
-        if "import" in code:
-            summary += "It imports external modules. "
-        if "async" in code or "await" in code:
-            summary += "It uses async/await patterns. "
-        if "try:" in code or "except" in code:
-            summary += "It includes error handling. "
-
-        summary += f"The code consists of {len(lines)} lines."
-
-        return summary
-
-    def _get_model_display_name(self, model_name: str) -> str:
-        """모델 이름을 표시용으로 변환합니다."""
-        mapping = {
-            "codet5": "CodeT5+",
-            "starcoder2": "StarCoder2",
-            "codellama": "CodeLlama-Instruct",
-            "unixcoder": "UniXcoder",
+    def _integrate_summaries(self, logic: str, intent: str, structure: str) -> str:
+        """유사도 기반 통합: 가장 긴 요약을 기준으로 나머지 정보 추가"""
+        summaries = {
+            "logic": logic,
+            "intent": intent,
+            "structure": structure
         }
-        return mapping.get(model_name, model_name)
 
+        # 1. 가장 긴 요약 선택 (보통 가장 상세)
+        base_key = max(summaries, key=lambda k: len(summaries[k]))
+        base = summaries[base_key]
+
+        # 2. 나머지 요약에서 unique 키워드 추출
+        other_summaries = [s for k, s in summaries.items() if k != base_key]
+        unique_info = []
+
+        for summary in other_summaries:
+            # 간단한 키워드 추출: 대문자로 시작하거나 특수 용어
+            words = summary.split()
+            for word in words:
+                if word.istitle() and word not in base and word not in unique_info:
+                    unique_info.append(word)
+
+        # 3. 통합
+        if unique_info:
+            return f"{base} Related aspects: {', '.join(unique_info[:3])}."
+        else:
+            return base
+
+    def _calculate_quality(self, logic: str, intent: str, structure: str) -> float:
+        """3개 요약의 일관성 점수 계산 (TF-IDF 유사도)"""
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.metrics.pairwise import cosine_similarity
+
+            # 1. TF-IDF 벡터화
+            vectorizer = TfidfVectorizer()
+            vectors = vectorizer.fit_transform([logic, intent, structure])
+
+            # 2. 쌍별 유사도
+            sim_matrix = cosine_similarity(vectors)
+            sim_12 = sim_matrix[0][1]
+            sim_23 = sim_matrix[1][2]
+            sim_13 = sim_matrix[0][2]
+
+            # 3. 평균 유사도 = 일관성
+            avg_similarity = (sim_12 + sim_23 + sim_13) / 3
+
+            return float(avg_similarity)
+
+        except Exception as e:
+            logger.warning(f"Quality calculation failed: {e}")
+            return 0.7  # 기본값
+
+    def _generate_summary(self, code: str, model_id: str, prompt_type: str = "general") -> str:
+        """HF API 호출 (프롬프트 타입 기반)"""
+        prompts = {
+            "logic": f"Summarize the function inputs, outputs, and core algorithm in one sentence:\n\n{code}",
+            "intent": f"Explain the business purpose and why this code exists in one sentence:\n\n{code}",
+            "structure": f"Describe the code structure, patterns, and design in one sentence:\n\n{code}",
+            "general": f"Summarize the following code's functionality in one sentence:\n\n{code}"
+        }
+
+        prompt = prompts.get(prompt_type, prompts["general"])
+
+        try:
+            response = self.client.text_generation(
+                prompt,
+                model=model_id,
+                max_new_tokens=100,
+                temperature=0.2,
+                do_sample=False
+            )
+            return response.strip()
+        except Exception as e:
+            logger.error(f"HF API Error ({model_id}, {prompt_type}): {e}")
+            return f"Summary generation failed for {prompt_type}."
 
 def create_summarizer(device: Optional[str] = None) -> CodeSummarizer:
-    """요약기를 생성합니다."""
     return CodeSummarizer(device=device)

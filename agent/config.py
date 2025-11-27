@@ -1,79 +1,53 @@
-"""Configuration for Agent Service."""
+"""
+agent/config.py
+Central configuration with Verified Safe Models for Free Tier.
+"""
 import os
-from typing import Dict, Any
 from dotenv import load_dotenv
 
 load_dotenv()
 
-
 class Config:
-    """기본 설정."""
+    # --- External APIs ---
+    HF_API_KEY = os.getenv("HF_API_KEY")
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-    # FastAPI 설정
-    DEBUG = os.getenv("DEBUG", "False").lower() == "true"
-    HOST = os.getenv("HOST", "0.0.0.0")
-    PORT = int(os.getenv("PORT", 8000))
-    WORKERS = int(os.getenv("WORKERS", 4))
+    # --- Model Provider Settings ---
+    # Options: "huggingface", "openai"
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "huggingface")
 
-    # MCP 서비스 URL
-    SUMMARIZATION_MCP_URL = os.getenv(
-        "SUMMARIZATION_MCP_URL",
-        "http://localhost:9001"
-    )
-    STRUCTURAL_ANALYSIS_MCP_URL = os.getenv(
-        "STRUCTURAL_ANALYSIS_MCP_URL",
-        "http://localhost:9002"
-    )
-    SEMANTIC_EMBEDDING_MCP_URL = os.getenv(
-        "SEMANTIC_EMBEDDING_MCP_URL",
-        "http://localhost:9003"
-    )
-    REPOSITORY_ANALYSIS_MCP_URL = os.getenv(
-        "REPOSITORY_ANALYSIS_MCP_URL",
-        "http://localhost:9004"
-    )
-    TASK_RECOMMENDER_MCP_URL = os.getenv(
-        "TASK_RECOMMENDER_MCP_URL",
-        "http://localhost:9005"
-    )
+    # --- Internal Services ---
+    BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://backend:4000/api")
+    GRAPH_MODEL_SERVER_URL = os.getenv("GRAPH_MODEL_SERVER_URL", "http://localhost:9000")
 
-    # 임시 저장소 설정
-    TEMP_REPO_DIR = os.getenv("TEMP_REPO_DIR", "/tmp/code_analysis_repos")
+    # --- File System ---
+    TEMP_DIR = "./temp_repos"
+    LOCAL_MODEL_DIR = "/Users/iyeonglag/PycharmProjects/2025-2-CSC4004-1-3-Fithub/models/RepoGraph"
 
-    # LangGraph 설정
+    # --- Settings ---
     MAX_RETRIES = 2
-    TIMEOUT = 300  # 5분
+    TIMEOUT = 60.0
 
-    # 기본 임계값
-    DEFAULT_THRESHOLDS = {
-        "codebleu_min": 0.42,
-        "bleurt_min": 0.05,
-        "rougeL_min": 0.30,
-        "edge_f1_min": 0.80,
-        "ged_max": 50.0,
-        "retry_max": 2,
-        "ensemble": True,
-    }
+    # --- 🤖 Model Configurations (Verified for Free Tier) ---
 
-    # MCP 엔드포인트 매핑
-    @classmethod
-    def get_mcp_endpoints(cls) -> Dict[str, str]:
-        """모든 MCP 엔드포인트를 반환합니다."""
-        return {
-            "summarization": cls.SUMMARIZATION_MCP_URL,
-            "structural_analysis": cls.STRUCTURAL_ANALYSIS_MCP_URL,
-            "semantic_embedding": cls.SEMANTIC_EMBEDDING_MCP_URL,
-            "repository_analysis": cls.REPOSITORY_ANALYSIS_MCP_URL,
-            "task_recommender": cls.TASK_RECOMMENDER_MCP_URL,
-        }
+    # 1. [요약] Salesforce/codet5-base
+    # 이유: CodeT5+ 보다 구형이지만, HF Free API에서 호환성이 훨씬 좋음 (에러 확률 낮음)
+    MODEL_SUMMARIZER = "Salesforce/codet5-base"
 
-    @classmethod
-    def health_check_urls(cls) -> Dict[str, str]:
-        """헬스 체크 URL을 반환합니다."""
-        return {
-            "summarization": f"{cls.SUMMARIZATION_MCP_URL}/health",
-            "structural_analysis": f"{cls.STRUCTURAL_ANALYSIS_MCP_URL}/health",
-            "semantic_embedding": f"{cls.SEMANTIC_EMBEDDING_MCP_URL}/health",
-            "repository_analysis": f"{cls.REPOSITORY_ANALYSIS_MCP_URL}/health",
-            "task_recommender": f"{cls.TASK_RECOMMENDER_MCP_URL}/health",
-        }
+    # 2. [임베딩] microsoft/graphcodebert-base
+    # 이유: 코드 임베딩의 표준. Feature Extraction API 지원이 확실함.
+    MODEL_EMBEDDER = "microsoft/graphcodebert-base"
+
+    # 3. [분석/태깅]
+    MODEL_LLM = "mistralai/Mistral-7B-Instruct-v0.3"
+    MODEL_LLM_OPENAI = "gpt-4o" # OpenAI 사용 시 기본 모델
+
+    # --- 🤖 Ensemble Summarization Models ---
+    # Logic Expert: 기능 요약 (입출력, 알고리즘)
+    MODEL_SUMMARIZER_LOGIC = "Salesforce/codet5-base"
+
+    # Intent Expert: 의도 분석 (비즈니스 로직, 존재 이유)
+    MODEL_SUMMARIZER_INTENT = "bigcode/starcoder2-3b"
+
+    # Structure Expert: 구조적 특징 (AST 패턴, 디자인 패턴)
+    MODEL_SUMMARIZER_STRUCTURE = "microsoft/unixcoder-base"

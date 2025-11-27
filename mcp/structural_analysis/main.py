@@ -21,6 +21,16 @@ app = FastAPI(
 # 글로벌 분석기
 analyzer = create_analyzer()
 
+# AWS 배포 시 모델 초기화
+# 이 코드는 서비스 시작 시 한 번만 실행되어
+# HuggingFace 모델을 메모리에 로드합니다
+try:
+    analyzer.initialize_models()
+    logger.info("✓ StructuralAnalyzer models initialized on startup")
+except Exception as e:
+    logger.warning(f"Models not available during startup (this is OK for development): {e}")
+    logger.info("Service will continue without model-based importance scoring")
+
 
 # ==================== Request/Response Models ====================
 

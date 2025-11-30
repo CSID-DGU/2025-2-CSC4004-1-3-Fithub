@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+///회원 정보
+model User {
+  id             Int              @id @default(autoincrement())
+  githubId       String           @unique
+  login          String
+  avatarUrl      String?
+  name           String?
+  email          String?
+  createdAt      DateTime         @default(now())
+
+  ownedProjects Project[]         @relation("UserOwnedProjects")
+  projectMembers ProjectMember[]  @relation("UserProjectMembers")
+  tasks         Task[]
+}
+
+//역할
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+
+  tasks         Task[]
+  projectMembers ProjectMember[]
+}
+
+
+///Repository 정보(기본정보, commit, files, pull requests)
+model repository {
+  repo_id        BigInt    @id
+  name           String?   @db.VarChar(255)
+  full_name      String?   @db.VarChar(255)
+  private        Boolean?
+  html_url       String?
+  description    String?
+  default_branch String?   @db.VarChar(255)
+  language       String?   @db.VarChar(255)
+  created_at     DateTime? @db.Timestamp(6)
+  updated_at     DateTime? @db.Timestamp(6)
+  pushed_at      DateTime? @db.Timestamp(6)
+  owner_login    String?   @db.VarChar(255)
+
+  commits commit[]
+  files   file[]
+  issues  issue[]
+  pulls   pull[]
+
+  projectRepositories ProjectRepository[]
+  codeSummaries       CodeSummary[]
+  tasks               Task[]
+
+  summaries   Summary[]
+  embeddings  Embedding[]
+  contextMeta ContextMeta?
+  graph       Graph?
+}
+
+model commit {
+  commit_sha   String    @id @db.VarChar(255)
+  repo_id      BigInt?
+  author_name  String?   @db.VarChar(255)
+  author_email String?   @db.VarChar(255)
+  date         DateTime? @db.Timestamp(6)
+  message      String?
+  parent_sha   String?   @db.VarChar(255)
+
+  repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model file {
+  file_id String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  repo_id BigInt?
+  path    String
+  sha     String? @db.VarChar(255)
+  size    Int?
+  type    String? @db.VarChar(50)
+
+  repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model issue {
+  issue_id   Int       @id
+  repo_id    BigInt?
+  title      String?
+  state      String?   @db.VarChar(50)
+  created_at DateTime? @db.Timestamp(6)
+  closed_at  DateTime? @db.Timestamp(6)
+
+  repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model pull {
+  pull_id    Int       @id
+  repo_id    BigInt?
+  title      String?
+  state      String?   @db.VarChar(50)
+  created_at DateTime? @db.Timestamp(6)
+  closed_at  DateTime? @db.Timestamp(6)
+
+  repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+///Project 정보(기본정보, 멤버, Github repository)
+model Project {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+  ownerId     Int 
+  owner       User    @relation("UserOwnedProjects", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  members   ProjectMember[]
+  repos     ProjectRepository[]
+  summaries CodeSummary[]
+  tasks     Task[]
+  createdAt DateTime @default(now())
+}
+
+model ProjectMember {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  userId    Int
+
+  role_id   Int?
+  role      Role?    @relation(fields: [role_id], references: [id])
+
+  project   Project  @relation(fields: [projectId], references: [id])
+  user      User     @relation("UserProjectMembers", fields: [userId], references: [id])
+}
+
+
+model ProjectRepository {
+  id        Int    @id @default(autoincrement())
+  projectId Int
+  repo_id   BigInt 
+
+  project Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repo    repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+}
+
+
+///AI모델에서 받아올 정보 (summary, task, graph, embedding, contextmeta)
+model CodeSummary {
+  id          Int     @id @default(autoincrement())
+  projectId   Int
+  repo_id     BigInt?
+  runId       String?
+  targetId    String 
+  level       String 
+  summaryText String
+  modelName   String? 
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+}
+
+model Task {
+  id             Int       @id @default(autoincrement())
+  projectId      Int
+  repo_id        BigInt?
+
+  title          String
+  description    String?
+  status         TaskStatus @default(UNDONE)
+
+  role_id        Int?
+  role           Role?      @relation(fields: [role_id], references: [id])
+
+  assigneeUserId Int?
+  assignee       User?      @relation(fields: [assigneeUserId], references: [id])
+
+  source         String     @default("AI")
+  runId          String?
+
+  project        Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repository     repository? @relation(fields: [repo_id], references: [repo_id], onDelete: SetNull)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+
+///Task 상태(미진행/진행중/완료)
+enum TaskStatus {
+  UNDONE
+  IN_PROGRESS
+  DONE
+}
+
+model Summary {
+  id        Int      @id @default(autoincrement())
+  repo_id   BigInt
+  filePath  String
+  summary   String
+  keywords  String[]
+  quality   Float?
+  createdAt DateTime @default(now())
+
+  repository repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+  embedding  Embedding?
+}
+model Embedding {
+  id          Int     @id @default(autoincrement())
+  summaryId   Int     @unique
+  fusedVector Json
+  rawEdges    Json
+
+  summary     Summary @relation(fields: [summaryId], references: [id])
+  repo_id     BigInt
+  repository  repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+}
+
+
+model ContextMeta {
+  id        Int      @id @default(autoincrement())
+  repo_id   BigInt   @unique
+  metaJson  Json
+  createdAt DateTime @default(now())
+
+  repository repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+}
+
+model Graph {
+  id        Int      @id @default(autoincrement())
+  repo_id   BigInt   @unique
+  graphJson Json
+  createdAt DateTime @default(now())
+
+  repository repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+}
+
+model GraphNode {
+  id        BigInt    @id @default(autoincrement())
+  repo_id   BigInt
+  file_path String?
+  label     String
+  type      String?       
+  metadata  Json?
+  edges_out GraphEdge[]   @relation("node_out")
+  edges_in  GraphEdge[]   @relation("node_in")
+}
+
+model GraphEdge {
+  id        BigInt   @id @default(autoincrement())
+  repo_id   BigInt
+  from_id   BigInt
+  to_id     BigInt
+  relation  String     
+  metadata  Json?
+
+  from GraphNode @relation("node_out", fields: [from_id], references: [id])
+  to   GraphNode @relation("node_in", fields: [to_id], references: [id])
+}

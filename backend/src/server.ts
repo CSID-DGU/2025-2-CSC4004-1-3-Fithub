@@ -8,7 +8,6 @@ import summaryRoutes from "./routes/summaryRoutes";
 import taskRoutes from "./routes/taskRoutes";
 import authRoutes from "./routes/authRoutes";
 import graphRoutes from "./routes/graphRoutes";
-import swaggerUi from "swagger-ui-express";
 import YAML from "yamljs";
 import dotenv from "dotenv";
 dotenv.config();
@@ -18,12 +17,10 @@ dotenv.config();
 };
 
 const app = express();
-const swaggerDocument = YAML.load("./src/openapi.yaml");
 
 app.use(cors());
 app.use(helmet());
 app.use(express.json());
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 //github oauth code를 받기 위한 리다이렉트용 dummy url -> 프론트 연동 후 삭제 예정
 app.get("/auth/github/dummy", (req, res) => {
@@ -42,6 +39,11 @@ app.use("/tasks", taskRoutes);
 app.use("/api/github", githubRoutes);
 app.use("/graph",graphRoutes);
 app.use(errorHandler);
+
+app.get("/", (_req, res) => {
+  res.send("Backend server is running.");
+});
+
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

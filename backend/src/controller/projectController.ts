@@ -6,7 +6,7 @@ import prisma from "../prisma";
 //create Project
 export const createProject = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user!.id; 
+    const userId = req.user!.id;
     const { name, description } = req.body;
 
     const project = await projectService.createProject({
@@ -34,6 +34,9 @@ export const getProjectById = async (req: Request, res: Response) => {
   }
 };
 
+import { dbService } from "../github/services/dbService";
+import { AIService } from "../services/aiService";
+
 //add repository to Project
 export const addRepoToProject = async (req: Request, res: Response) => {
   try {
@@ -41,6 +44,29 @@ export const addRepoToProject = async (req: Request, res: Response) => {
       Number(req.params.projectId),
       BigInt(req.body.repo_id)
     );
+
+    // Trigger AI Analysis asynchronously
+    const repoId = String(req.body.repo_id);
+    dbService.getRepo(repoId).then(async (repo) => {
+      if (repo && repo.full_name) {
+        const repoUrl = `https://github.com/${repo.full_name}`;
+        console.log(`Triggering AI analysis for ${repoUrl}...`);
+        try {
+          const runId = await AIService.analyzeRepository(repoUrl);
+          console.log(`Analysis started with Run ID: ${runId}`);
+
+          // Poll for results (optional, or just let it run)
+          // In a real app, you might want to store runId in DB
+          AIService.pollAnalysisResult(runId)
+            .then(result => console.log(`Analysis completed for ${repoUrl}:`, result.status))
+            .catch(err => console.error(`Analysis polling failed for ${repoUrl}:`, err));
+
+        } catch (error) {
+          console.error(`Failed to trigger analysis for ${repoUrl}:`, error);
+        }
+      }
+    }).catch(err => console.error("Failed to fetch repo info for analysis:", err));
+
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: "Failed to add repository to project" });
@@ -117,7 +143,7 @@ export const getProjectRoles = async (req: Request, res: Response) => {
 export const setProjectMemberRole = async (req: AuthRequest, res: Response) => {
   try {
     const projectId = Number(req.params.projectId);
-    const userId = req.user!.id;     
+    const userId = req.user!.id;
     const { role_id } = req.body;
 
     if (!role_id) {

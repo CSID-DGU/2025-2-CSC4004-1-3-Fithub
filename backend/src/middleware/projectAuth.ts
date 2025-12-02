@@ -15,6 +15,11 @@ export const requireProjectOwner = async (
     return res.status(401).json({ error: "Unauthorized" });
   }
 
+  //projectId 검증
+  if (!projectId || isNaN(projectId)) {
+    return res.status(400).json({ error: "Invalid or missing projectId in params" });
+  }
+
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -26,8 +31,10 @@ export const requireProjectOwner = async (
   if (project.ownerId !== userId) {
     return res.status(403).json({ error: "Only owner can modify members" });
   }
+
   next();
 };
+
 
 //프로젝트 멤버인지 여부 확인
 export const requireProjectMember = async (
@@ -42,15 +49,17 @@ export const requireProjectMember = async (
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  //이 프로젝트에 userId가 멤버로 존재하는지 여부 확인
-  const membership = await prisma.projectMember.findFirst({
-    where: {
-      projectId,
-      userId,
-    },
-  });
-  if (!membership) {
-    return res.status(403).json({ error: "Access denied: not a project member" });
+  if (!projectId || isNaN(projectId)) {
+    return res.status(400).json({ error: "Invalid or missing projectId in params" });
   }
+
+  const membership = await prisma.projectMember.findFirst({
+    where: { projectId, userId },
+  });
+
+  if (!membership) {
+    return res.status(403).json({ error: "Not a project member" });
+  }
+
   next();
 };

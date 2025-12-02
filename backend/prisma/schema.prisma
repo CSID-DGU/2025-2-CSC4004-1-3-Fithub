@@ -17,21 +17,11 @@ model User {
   email          String?
   createdAt      DateTime         @default(now())
 
+  githubAccessToken String?
   ownedProjects Project[]         @relation("UserOwnedProjects")
   projectMembers ProjectMember[]  @relation("UserProjectMembers")
   tasks         Task[]
 }
-
-//역할
-model Role {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  description String?
-
-  tasks         Task[]
-  projectMembers ProjectMember[]
-}
-
 
 ///Repository 정보(기본정보, commit, files, pull requests)
 model repository {
@@ -127,14 +117,22 @@ model ProjectMember {
   id        Int      @id @default(autoincrement())
   projectId Int
   userId    Int
-
-  role_id   Int?
-  role      Role?    @relation(fields: [role_id], references: [id])
+  
+  role      Role?    // enum role
 
   project   Project  @relation(fields: [projectId], references: [id])
   user      User     @relation("UserProjectMembers", fields: [userId], references: [id])
 }
 
+///역할 정보
+enum Role{
+  FRONTEND
+  BACKEND
+  AI
+  DEVOPS
+  DATABASE
+  COMMON
+}
 
 model ProjectRepository {
   id        Int    @id @default(autoincrement())
@@ -144,6 +142,7 @@ model ProjectRepository {
   project Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   repo    repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
 }
+
 
 
 ///AI모델에서 받아올 정보 (summary, task, graph, embedding, contextmeta)
@@ -172,8 +171,8 @@ model Task {
   description    String?
   status         TaskStatus @default(UNDONE)
 
-  role_id        Int?
-  role           Role?      @relation(fields: [role_id], references: [id])
+  
+  role      Role?    // enum role
 
   assigneeUserId Int?
   assignee       User?      @relation(fields: [assigneeUserId], references: [id])

@@ -1,32 +1,56 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { requireGitHubToken, requireRepoFullName } from "../middleware/validateInput";
-import { snapshotService } from "../github/services/snapshotService";
 import { githubDbController } from "../controller/githubDbController";
+import { requireAuth,AuthRequest } from "../middleware/authMiddleware";
+import { snapshotService } from "../github/services/snapshotService";
+import prisma from "../prisma";
 
 const router = Router();
 
-// Snapshot
-router.post(
-  "/repo-snapshot",
-  requireGitHubToken,
-  requireRepoFullName,
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const token = (req as any).githubToken as string;
-      const owner = (req as any).owner as string;
-      const repo = (req as any).repo as string;
+//repo-snapshot
+router.post("/repo-snapshot", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { repoFullName } = req.body;
 
-      const snapshot = await snapshotService.createSnapshot(owner, repo, token);
-      res.json(snapshot);
-    } catch (err) {
-      next(err);
+    if (!repoFullName || !repoFullName.includes("/")) {
+      return res.status(400).json({
+        error: "repoFullName must be 'owner/repo'",
+      });
     }
-  }
-);
 
-// Repos
+    const [owner, repo] = repoFullName.split("/");
+
+    const userId = req.user!.id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { githubAccessToken: true }
+    });
+
+    if (!user?.githubAccessToken) {
+      return res.status(400).json({
+        error: "User has no GitHub access token registered"
+      });
+    }
+
+    const snapshot = await snapshotService.createSnapshot(
+      owner,
+      repo,
+      user.githubAccessToken
+    );
+
+    res.json(snapshot);
+
+  } catch (err) {
+    next(err);
+  }
+});
+
+//Repos info
 router.get("/repos/:repoId", githubDbController.getRepo);
 router.get("/repos/:repoId/files/tree", githubDbController.getRepoFileTree);
+
+//File tree
+router.post("/repos/files/tree", requireAuth,githubDbController.getRepoFileTree);
 
 //File list
 router.get("/repos/:repoId/files", githubDbController.getRepoFiles);

@@ -1,7 +1,8 @@
-//get repository, file(+tree), commit, issue, pull request and details
 import { Request, Response, NextFunction } from "express";
 import { dbService } from "../github/services/dbService";
 import { createGitHubClient } from "../github/client/githubClient";
+import prisma from "../prisma";
+import { AuthRequest } from "../middleware/authMiddleware";
 
 export const githubDbController = {
 
@@ -48,30 +49,59 @@ export const githubDbController = {
     }
   },
 
-  //get file tree
   async getRepoFileTree(req: Request, res: Response, next: NextFunction) {
   try {
-    const { repoId } = req.params;
+    const { repoId } = req.body; 
+
+    if (!repoId) {
+      return res.status(400).json({ message: "repoId is required" });
+    }
+
     const repo = await dbService.getRepo(repoId);
+
     if (!repo) {
       return res.status(404).json({ message: "Repository not found" });
     }
 
-    const [owner, repoName] = repo.full_name!.split("/");
+    const [owner, repoNameRaw] = repo.full_name!.split("/");
+    const repoName = repoNameRaw.replace(/\.git$/, "");
 
-    const token = process.env.GITHUB_PERSONAL_TOKEN!;
-    const octokit = createGitHubClient(token);
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { githubAccessToken: true },
+    });
 
-    const tree = await octokit.request(
-      "GET /repos/{owner}/{repo}/git/trees/{branch}",
+    if (!user?.githubAccessToken) {
+      return res.status(401).json({
+        error: "GitHub access token missing. Please login again.",
+      });
+    }
+
+    const octokit = createGitHubClient(user.githubAccessToken);
+
+    //get tree SHA from branch
+    const branchInfo = await octokit.request(
+      "GET /repos/{owner}/{repo}/branches/{branch}",
       {
         owner,
         repo: repoName,
         branch: repo.default_branch || "main",
+      }
+    );
+
+    const treeSha = branchInfo.data.commit.commit.tree.sha;
+
+    //get filetree
+    const tree = await octokit.request(
+      "GET /repos/{owner}/{repo}/git/trees/{tree_sha}",
+      {
+        owner,
+        repo: repoName,
+        tree_sha: treeSha,
         recursive: "1",
       }
     );
-    
+
     return res.json(tree.data);
 
   } catch (error) {
@@ -79,7 +109,7 @@ export const githubDbController = {
   }
 },
 
-  //get commits
+  //get commits (DB 저장된 commit 목록)
   async getRepoCommits(req: Request, res: Response, next: NextFunction) {
     try {
       const { repoId } = req.params;
@@ -106,7 +136,7 @@ export const githubDbController = {
     }
   },
 
-  //get issues
+  //get issues (DB에 저장된 issue 목록)
   async getRepoIssues(req: Request, res: Response, next: NextFunction) {
     try {
       const { repoId } = req.params;
@@ -133,7 +163,7 @@ export const githubDbController = {
     }
   },
 
-  //get pull requests
+  //get pull requests (DB 저장된 pull 목록)
   async getRepoPulls(req: Request, res: Response, next: NextFunction) {
     try {
       const { repoId } = req.params;
@@ -153,6 +183,7 @@ export const githubDbController = {
       if (!pull) {
         return res.status(404).json({ message: "Pull request not found" });
       }
+
       return res.json(pull);
     } catch (error) {
       next(error);

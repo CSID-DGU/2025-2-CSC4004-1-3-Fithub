@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -9,8 +12,7 @@ import taskRoutes from "./routes/taskRoutes";
 import authRoutes from "./routes/authRoutes";
 import graphRoutes from "./routes/graphRoutes";
 import YAML from "yamljs";
-import dotenv from "dotenv";
-dotenv.config();
+
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();

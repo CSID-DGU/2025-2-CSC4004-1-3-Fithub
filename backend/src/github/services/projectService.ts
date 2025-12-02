@@ -35,12 +35,32 @@ export const getProjectById = async (projectId: number) => {
 };
 
 
-//aod repository to Project
-export const addRepoToProject = async (projectId: number, repoId: bigint) => {
+// add repository to Project
+export const addRepoToProject = async (
+  projectId: number,
+  githubRepo: {
+    id: bigint;
+    name: string;
+    full_name: string;
+    html_url: string;
+  }
+) => {
+
+  const repo = await prisma.repository.upsert({
+    where: { repo_id: githubRepo.id },
+    update: {},
+    create: {
+      repo_id: githubRepo.id,
+      name: githubRepo.name,
+      full_name: githubRepo.full_name,
+      html_url: githubRepo.html_url,
+    },
+  });
+
   const projectRepo = await prisma.projectRepository.create({
     data: {
       projectId,
-      repo_id: repoId,
+      repo_id: repo.repo_id,
     },
   });
 
@@ -75,4 +95,38 @@ export const removeProjectMember = async (projectId: number, userId: number) => 
       userId,
     },
   });
+};
+
+//get role list(Enum type)
+export const getRoles = ()=>{
+  return[
+    "FRONTEND",
+    "BACKEND",
+    "AI",
+    "DEVOPS",
+    "DATABASE",
+    "COMMON"
+  ];
+}
+
+//update Project Member roles
+export const updateProjectMemberRole = async (
+  projectId: number,
+  memberId: number,
+  role: string
+) => {
+  const member = await prisma.projectMember.findUnique({
+    where: { id: memberId },
+  });
+
+  if (!member) {
+    throw new Error("Project member not found");
+  }
+
+  const updated = await prisma.projectMember.update({
+    where: { id: memberId },
+    data: { role: role as any },
+  });
+
+  return updated;
 };

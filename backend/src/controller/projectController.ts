@@ -2,23 +2,36 @@ import { Request, Response } from "express";
 import * as projectService from "../github/services/projectService";
 import { AuthRequest } from "../middleware/authMiddleware";
 import prisma from "../prisma";
+import * as githubService from "../github/githubService";   
 
-//create Project
 export const createProject = async (req: AuthRequest, res: Response) => {
   try {
+<<<<<<< HEAD
     const userId = req.user!.id;
+=======
+>>>>>>> be3bd69 (edited: authorization , project role , db prisma)
     const { name, description } = req.body;
+
+    //check JWT authorization
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        error: "Unauthorized: JWT가 필요합니다.",
+      });
+    }
+
+    //ownerId <-JWT
+    const ownerId = req.user.id;
 
     const project = await projectService.createProject({
       name,
       description,
-      ownerId: userId,
+      ownerId,
     });
 
-    res.json(project);
+    return res.json(project);
   } catch (err) {
     console.error("Create project error:", err);
-    res.status(500).json({ error: "Failed to create project" });
+    return res.status(500).json({ error: "Failed to create project" });
   }
 };
 
@@ -34,6 +47,7 @@ export const getProjectById = async (req: Request, res: Response) => {
   }
 };
 
+<<<<<<< HEAD
 import { dbService } from "../github/services/dbService";
 import { AIService } from "../services/aiService";
 
@@ -66,9 +80,25 @@ export const addRepoToProject = async (req: Request, res: Response) => {
         }
       }
     }).catch(err => console.error("Failed to fetch repo info for analysis:", err));
+=======
+//add github repository to project
+export const addRepoToProject = async (req: Request, res: Response) => {
+  try {
+    const { owner, repo, token } = req.body;
+    const projectId = Number(req.params.projectId);
+
+    const githubRepo = await githubService.getRepoInfo(owner, repo, token);
+    const result = await projectService.addRepoToProject(projectId, {
+      id: BigInt(githubRepo.id),
+      name: githubRepo.name,
+      full_name: githubRepo.full_name,
+      html_url: githubRepo.html_url,
+    });
+>>>>>>> be3bd69 (edited: authorization , project role , db prisma)
 
     res.json(result);
   } catch (err) {
+    console.error("Add repo error:", err);
     res.status(500).json({ error: "Failed to add repository to project" });
   }
 };
@@ -128,17 +158,31 @@ export const removeProjectMember = async (req: AuthRequest, res: Response) => {
 };
 
 
-//get project roles 
-export const getProjectRoles = async (req: Request, res: Response) => {
+//get project role list
+export const getUserRoles = (req: Request, res: Response) => {
+  const roles=projectService.getRoles();
+  res.json(roles);
+};
+
+//update project roles
+export const updateProjectMemberRole = async (req: AuthRequest, res: Response) => {
   try {
-    const roles = await prisma.role.findMany();
-    res.json(roles);
-  } catch (err) {
-    console.error("Get roles error:", err);
-    res.status(500).json({ error: "Failed to get roles" });
+    const { projectId, memberId } = req.params;
+    const { role } = req.body;
+
+    const updated = await projectService.updateProjectMemberRole(
+      Number(projectId),
+      Number(memberId),
+      role
+    );
+
+    res.status(200).json(updated);
+  } catch (err:any) {
+    res.status(500).json({ error: err.message });
   }
 };
 
+<<<<<<< HEAD
 //chooese project roles
 export const setProjectMemberRole = async (req: AuthRequest, res: Response) => {
   try {
@@ -170,3 +214,5 @@ export const setProjectMemberRole = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: "Failed to set role" });
   }
 };
+=======
+>>>>>>> be3bd69 (edited: authorization , project role , db prisma)

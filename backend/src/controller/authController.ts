@@ -1,14 +1,13 @@
-//github authorization
 import { Request, Response } from "express";
 import * as authService from "../github/services/authService";
 
-//github login (front → backend)
+//GitHub OAuth login front -> backend): return token + user 
 export const githubOAuthLogin = async (req: Request, res: Response) => {
   try {
     const { code } = req.body;
 
     if (!code) {
-        return res.status(400).json({ error: "Missing 'code' in request body" });
+      return res.status(400).json({ error: "Missing 'code' in request body" });
     }
 
     const result = await authService.loginWithGitHub(code);
@@ -26,8 +25,7 @@ export const githubOAuthLogin = async (req: Request, res: Response) => {
   }
 };
 
-
-//callback -> GitHub OAuth redirect after login (GitHub → backend)
+//GitHub OAuth callback (GitHub -> backend -> redirect to front)
 export const githubOAuthCallback = async (req: Request, res: Response) => {
   try {
     const { code } = req.query;
@@ -36,12 +34,11 @@ export const githubOAuthCallback = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing 'code' in query" });
     }
 
-    // GitHub OAuth → access_token → user → JWT
     const result = await authService.loginWithGitHub(String(code));
 
-    const jwt = result.token;
+    const FRONTEND_URL = "http://localhost:3000/oauth/success";
 
-    return res.redirect(`http://localhost:3000/oauth/success?token=${jwt}`);
+    return res.redirect(`${FRONTEND_URL}?token=${result.token}`);
 
   } catch (err: any) {
     console.error("GitHub OAuth Callback Error:", err);

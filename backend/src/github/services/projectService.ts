@@ -1,6 +1,7 @@
 import prisma from "../../prisma";
+import { Role } from "@prisma/client";
 
-//create Project
+//프로젝트 생성
 export const createProject = async (data: any) => {
   const { name, description, ownerId } = data;
 
@@ -14,7 +15,7 @@ export const createProject = async (data: any) => {
   return project;
 };
 
-//get Project info
+//프로젝트 상세정보 조회
 export const getProjectById = async (projectId: number) => {
   return prisma.project.findUnique({
     where: { id: projectId },
@@ -35,7 +36,7 @@ export const getProjectById = async (projectId: number) => {
 };
 
 
-// add repository to Project
+//프로젝트에 github 레포지토리 추가
 export const addRepoToProject = async (
   projectId: number,
   githubRepo: {
@@ -67,7 +68,7 @@ export const addRepoToProject = async (
   return projectRepo;
 };
 
-//add member to Project
+//프로젝트 멤버 추가
 export const addMemberToProject = async (projectId: number, userId: number) => {
   return prisma.projectMember.create({
     data: {
@@ -77,7 +78,36 @@ export const addMemberToProject = async (projectId: number, userId: number) => {
   });
 };
 
-//get Proejct Members
+//프로젝트 삭제
+export const deleteProject = async (projectId: number) => {
+  //프로젝트 존재 여부 확인
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
+
+  if (!project) return null;
+
+  await prisma.projectRepository.deleteMany({
+    where: { projectId },
+  });
+
+  await prisma.project.delete({
+    where: { id: projectId },
+  });
+
+  return true;
+};
+
+export const getProjectLists = async () => {
+  const projects = await prisma.project.findMany({
+    orderBy: { createdAt: "desc" }, 
+  });
+
+  return projects;
+};
+
+
+//프로젝트 멤버 조회
 export const getProjectMembers = async (projectId: number) => {
   return prisma.projectMember.findMany({
     where: { projectId },
@@ -87,7 +117,7 @@ export const getProjectMembers = async (projectId: number) => {
   });
 };
 
-//delete Project Members
+//프로젝트 멤버 삭제
 export const removeProjectMember = async (projectId: number, userId: number) => {
   return prisma.projectMember.deleteMany({
     where: {
@@ -97,7 +127,7 @@ export const removeProjectMember = async (projectId: number, userId: number) => 
   });
 };
 
-//get role list(Enum type)
+//프로젝트 역할 
 export const getRoles = ()=>{
   return[
     "FRONTEND",
@@ -109,7 +139,7 @@ export const getRoles = ()=>{
   ];
 }
 
-//update Project Member roles
+//프로젝트 멤버 역할 업데이트(배정,수정)
 export const updateProjectMemberRole = async (
   projectId: number,
   memberId: number,
@@ -129,4 +159,31 @@ export const updateProjectMemberRole = async (
   });
 
   return updated;
+};
+
+//프로젝트 멤버 역할 삭제 
+export const removeRoleFromMember = async (
+  projectId: number,
+  userId: number,
+  role: string
+) => {
+  
+  //ProjectMember 존재 여부 확인
+  const member = await prisma.projectMember.findFirst({
+    where: {
+      projectId,
+      userId,
+      role: role as Role,
+    }
+  });
+
+  if (!member) return null;
+
+  await prisma.projectMember.delete({
+    where: {
+      id: member.id, 
+    }
+  });
+
+  return true;
 };

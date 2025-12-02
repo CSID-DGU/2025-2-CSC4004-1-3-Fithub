@@ -42,7 +42,7 @@ app.use("/auth", authRoutes);
 app.use("/projects", projectRoutes);          
 app.use("/summaries", summaryRoutes);
 app.use("/tasks", taskRoutes);
-app.use("/api/github", githubRoutes);
+app.use("/github", githubRoutes);
 app.use("/graph",graphRoutes);
 app.use(errorHandler);
 

@@ -77,18 +77,19 @@ model file {
 }
 
 model issue {
-  issue_id   Int       @id
+  issue_id   BigInt      @id
   repo_id    BigInt?
   title      String?
-  state      String?   @db.VarChar(50)
-  created_at DateTime? @db.Timestamp(6)
-  closed_at  DateTime? @db.Timestamp(6)
+  state      String?      @db.VarChar(50)
+  created_at DateTime?    @db.Timestamp(6)
+  closed_at  DateTime?    @db.Timestamp(6)
 
-  repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade, onUpdate: NoAction)
+  repository repository?  @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade, onUpdate: NoAction)
 }
 
+
 model pull {
-  pull_id    Int       @id
+  pull_id    BigInt       @id
   repo_id    BigInt?
   title      String?
   state      String?   @db.VarChar(50)
@@ -121,7 +122,7 @@ model ProjectMember {
   role      Role?    // enum role
 
   project   Project  @relation(fields: [projectId], references: [id])
-  user      User     @relation("UserProjectMembers", fields: [userId], references: [id])
+  user      User     @relation("UserProjectMembers", fields: [userId], references: [id], onDelete:Cascade)
 }
 
 ///역할 정보

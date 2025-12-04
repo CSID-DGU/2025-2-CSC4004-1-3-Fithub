@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fithub Graph Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #1a1a1a;
+            color: #fff;
+            font-family: sans-serif;
+        }
+
+        #graph {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #555;
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            font-size: 12px;
+            max-width: 300px;
+            display: none;
+        }
+
+        .node circle {
+            stroke: #fff;
+            stroke-width: 1.5px;
+            cursor: pointer;
+        }
+
+        .link {
+            stroke: #555;
+            stroke-opacity: 0.6;
+        }
+
+        .group-hull {
+            fill: rgba(255, 255, 255, 0.05);
+            stroke: rgba(255, 255, 255, 0.1);
+            stroke-width: 1;
+            stroke-dasharray: 4;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="graph"></div>
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Load JSON data (Assuming verification_result.json is in the same directory or served)
+        // For local testing without server, you might need to paste the JSON content here or run a local server.
+        d3.json("../../verification_result.json").then(data => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            const svg = d3.select("#graph").append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .call(d3.zoom().on("zoom", (event) => {
+                    g.attr("transform", event.transform);
+                }));
+
+            const g = svg.append("g");
+
+            const nodes = data.graph.nodes;
+            const links = data.graph.edges.map(d => ({ ...d }));
+
+            // Grouping Logic: Map parent IDs to their child nodes
+            const groups = d3.group(nodes, d => d.parent || d.id);
+
+            // Force Simulation
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === 'defines' ? 20 : 100)) // Hierarchy is tighter
+                .force("charge", d3.forceManyBody().strength(d => d.type === 'file' ? -300 : -50)) // Files repel more
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collide", d3.forceCollide().radius(d => d.size + 10))
+                .force("group", isolate(d3.forceManyBody().strength(30), d => d.parent)); // Pull children to parents
+
+            function isolate(force, filter) {
+                let initialize = force.initialize;
+                force.initialize = function () { initialize.call(force, nodes.filter(filter)); };
+                return force;
+            }
+
+            // Render Links
+            const link = g.append("g")
+                .attr("class", "links")
+                .selectAll("line")
+                .data(links)
+                .enter().append("line")
+                .attr("class", "link")
+                .attr("stroke-width", d => d.type === 'defines' ? 2 : (d.type === 'imports' ? 1.5 : 1))
+                .attr("stroke", d => d.type === 'defines' ? '#fff' : (d.type === 'imports' ? '#ffcc00' : '#555'))
+                .attr("stroke-opacity", d => d.type === 'defines' ? 0.8 : 0.4);
+
+            // Render Nodes
+            const node = g.append("g")
+                .attr("class", "nodes")
+                .selectAll("g")
+                .data(nodes)
+                .enter().append("g")
+                .attr("class", "node")
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            node.append("circle")
+                .attr("r", d => d.size)
+                .attr("fill", d => d.color)
+                .attr("stroke", d => d.type === 'file' ? '#fff' : 'none')
+                .attr("stroke-width", d => d.type === 'file' ? 2 : 0);
+
+            node.append("text")
+                .attr("dx", d => d.size + 5)
+                .attr("dy", ".35em")
+                .text(d => d.label)
+                .style("font-size", d => d.type === 'file' ? "12px" : "10px")
+                .style("font-weight", d => d.type === 'file' ? "bold" : "normal")
+                .style("fill", "#ddd")
+                .style("pointer-events", "none");
+
+            // Tooltip Interaction
+            const tooltip = d3.select("#tooltip");
+
+            node.on("mouseover", (event, d) => {
+                tooltip.style("display", "block")
+                    .html(`
+                        <strong>${d.label}</strong> (${d.type})<br/>
+                        <span style="color:#aaa">${d.id}</span><br/>
+                        ${d.parent ? `<span style="color:#888">Parent: ${d.parent}</span><br/>` : ''}
+                        <hr style="border-color:#555"/>
+                        ${d.summary_details.logic ? `<b>Logic:</b> ${d.summary_details.logic}<br/>` : ''}
+                        ${d.summary_details.intent ? `<b>Intent:</b> ${d.summary_details.intent}<br/>` : ''}
+                        ${d.summary_details.structure ? `<b>Structure:</b> ${d.summary_details.structure}<br/>` : ''}
+                        ${!d.summary_details.logic ? `<i>${d.summary || 'No summary available'}</i>` : ''}
+                    `);
+            })
+                .on("mousemove", (event) => {
+                    tooltip.style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY + 10) + "px");
+                })
+                .on("mouseout", () => {
+                    tooltip.style("display", "none");
+                });
+
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -131,7 +131,10 @@ class GraphBuilder:
             G.add_node(nid,
                        label=node.get('label', nid.split('/')[-1]),
                        domain=meta.get('domain_tag', 'General'),  # Color
-                       layer=meta.get('layer', 'Module')  # Layout
+                       layer=meta.get('layer', 'Module'),  # Layout
+                       summary_text=node.get('summary_text', ''),
+                       summary_details=node.get('summary_details', {}),
+                       type=node.get('type', 'file')
                        )
             
             # 노드 속성에 점수 저장 (나중에 시각화용)
@@ -139,10 +142,16 @@ class GraphBuilder:
 
         # 3. 엣지 추가
         for edge in edges:
-            G.add_edge(edge['source'], edge['target'], type='physical')
+            G.add_edge(edge['source'], edge['target'], type=edge.get('type', 'physical'))
 
         for logic in context_metadata.get('logical_edges', []):
             G.add_edge(logic['source'], logic['target'], type='logical')
+
+        # [NEW] Pre-process edges to find parent-child relationships for subgraphs
+        parent_map = {}
+        for edge in edges:
+            if edge.get('type') == 'defines':
+                parent_map[edge['target']] = edge['source']
 
         # 4. 최종 JSON 변환
         final_nodes = []
@@ -153,14 +162,25 @@ class GraphBuilder:
             color = self._get_color(meta.get('domain', 'General'))
             
             # Size Decision (RepoGraph Score 기반)
-            size = 20 + (meta.get('importance', 0.5) * 80) # 20 ~ 100
+            # [NEW] Hierarchy Visualization: Files are larger, structural nodes are smaller
+            base_size = 20
+            if meta.get('type') == 'file':
+                size = 20 + (meta.get('importance', 0.5) * 80) # 20 ~ 100
+            else:
+                size = 10 + (meta.get('importance', 0.5) * 20) # 10 ~ 30 (Smaller for sub-nodes)
 
             final_nodes.append({
                 "id": nid,
                 "label": meta.get('label', nid),
                 "size": size,
                 "color": color,
-                "group": meta.get('layer', 'Unknown')
+                "group": meta.get('layer', 'Unknown'),
+                "type": meta.get('type', 'file'), # [NEW] Node Type
+                "parent": parent_map.get(nid), # [NEW] Parent ID for Subgraph
+                "summary": meta.get('summary_text', ''),
+                "summary_details": meta.get('summary_details', {}), # [NEW] Detailed Summaries
+                "domain": meta.get('domain', 'General'),
+                "importance": meta.get('importance', 0.5)
             })
 
         return {"nodes": final_nodes, "edges": [{"source": u, "target": v, "type": d.get("type", "physical")} for u, v, d in G.edges(data=True)]}

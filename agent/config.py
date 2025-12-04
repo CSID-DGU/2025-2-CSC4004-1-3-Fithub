@@ -27,6 +27,7 @@ class Config:
     # --- Settings ---
     MAX_RETRIES = 2
     TIMEOUT = 60.0
+    MAX_ANALYSIS_FILES = 50 # Reduced for testing (was 10000)
 
     # --- 🤖 Model Configurations (Verified for Free Tier) ---
 

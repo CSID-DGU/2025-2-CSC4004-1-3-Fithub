@@ -67,25 +67,35 @@ model commit {
 
 model file {
   file_id String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  
   repo_id BigInt?
   path    String
   sha     String? @db.VarChar(255)
   size    Int?
   type    String? @db.VarChar(50)
 
+  content String? @db.Text   
+
   repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade, onUpdate: NoAction)
 }
 
-model issue {
-  issue_id   BigInt      @id
-  repo_id    BigInt?
-  title      String?
-  state      String?      @db.VarChar(50)
-  created_at DateTime?    @db.Timestamp(6)
-  closed_at  DateTime?    @db.Timestamp(6)
 
-  repository repository?  @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade, onUpdate: NoAction)
+model issue {
+  issue_id     BigInt      @id
+  repo_id      BigInt?
+
+  issue_number Int?
+  issue_url    String?
+  author       Json?
+
+  title        String?
+  state        String?      @db.VarChar(50)
+  created_at   DateTime?    @db.Timestamp(6)
+  closed_at    DateTime?    @db.Timestamp(6)
+
+  repository   repository?  @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade, onUpdate: NoAction)
 }
+
 
 
 model pull {
@@ -239,14 +249,16 @@ model Graph {
 }
 
 model GraphNode {
-  id        BigInt    @id @default(autoincrement())
-  repo_id   BigInt
-  file_path String?
-  label     String
-  type      String?       
-  metadata  Json?
-  edges_out GraphEdge[]   @relation("node_out")
-  edges_in  GraphEdge[]   @relation("node_in")
+  id          BigInt   @id @default(autoincrement()) // internal PK
+  repo_id     BigInt
+  external_id String                                // dummy node.id
+  parent_id   String?                               // dummy parent
+  label       String
+  type        String?
+  metadata    Json?
+
+  edges_out GraphEdge[] @relation("node_out")
+  edges_in  GraphEdge[] @relation("node_in")
 }
 
 model GraphEdge {
@@ -254,7 +266,7 @@ model GraphEdge {
   repo_id   BigInt
   from_id   BigInt
   to_id     BigInt
-  relation  String     
+  relation  String
   metadata  Json?
 
   from GraphNode @relation("node_out", fields: [from_id], references: [id])

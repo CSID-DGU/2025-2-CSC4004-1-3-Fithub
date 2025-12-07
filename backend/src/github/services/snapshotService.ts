@@ -4,43 +4,37 @@ import { treeService } from "./treeService";
 import { commitService } from "./commitService";
 import { issueService } from "./issueService";
 import { pullService } from "./pullService";
+import { createGitHubClient } from "../client/githubClient";
 
 export const snapshotService = {
   async createSnapshot(owner: string, repo: string, token: string) {
     console.log("Snapshot Start:", owner, repo);
 
     const repoInfo = await repoService.getRepoInfo(owner, repo, token);
-    console.log("repoInfo.id =", repoInfo.id);
-    const repoId = BigInt(repoInfo.id); 
+    const repoId = BigInt(repoInfo.id);
 
-    let savedRepo;
-    try {
-      console.log("repository upsert start");
+    const savedRepo = await prisma.repository.upsert({
+      where: { repo_id: repoId },
+      update: {},
+      create: {
+        repo_id: repoId,
+        name: repoInfo.name,
+        full_name: repoInfo.full_name,
+        private: repoInfo.private,
+        html_url: repoInfo.html_url,
+        description: repoInfo.description,
+        default_branch: repoInfo.default_branch,
+        language: repoInfo.language,
+        created_at: repoInfo.created_at ? new Date(repoInfo.created_at) : null,
+        updated_at: repoInfo.updated_at ? new Date(repoInfo.updated_at) : null,
+        pushed_at: repoInfo.pushed_at ? new Date(repoInfo.pushed_at) : null,
+        owner_login: repoInfo.owner?.login || "",
+      },
+    });
 
-      savedRepo = await prisma.repository.upsert({
-        where: { repo_id: repoId },
-        update: {},
-        create: {
-          repo_id: repoId,
-          name: repoInfo.name,
-          full_name: repoInfo.full_name,
-          private: repoInfo.private,
-          html_url: repoInfo.html_url,
-          description: repoInfo.description,
-          default_branch: repoInfo.default_branch,
-          language: repoInfo.language,
-          created_at: repoInfo.created_at ? new Date(repoInfo.created_at) : null,
-          updated_at: repoInfo.updated_at ? new Date(repoInfo.updated_at) : null,
-          pushed_at: repoInfo.pushed_at ? new Date(repoInfo.pushed_at) : null,
-          owner_login: repoInfo.owner?.login || "",
-        },
-      });
+    console.log("Repository saved:", savedRepo.repo_id);
 
-      console.log("Repository successfully saved", savedRepo.repo_id);
-    } catch (err) {
-      console.error("Repository upsert failed", err);
-      throw err; 
-    }
+    const octokit = createGitHubClient(token);
 
     const tree = await treeService.getRepoTree(
       owner,
@@ -48,29 +42,48 @@ export const snapshotService = {
       repoInfo.default_branch,
       token
     );
-    console.log("Tree files:", tree?.tree?.length);
 
     await prisma.file.deleteMany({ where: { repo_id: savedRepo.repo_id } });
 
+    console.log("Tree count:", tree.tree?.length);
+
     if (tree.tree && Array.isArray(tree.tree)) {
       for (const f of tree.tree) {
-        if (f.type === "blob") {
-          await prisma.file.create({
-            data: {
-              repo_id: savedRepo.repo_id,
-              path: f.path,
-              sha: f.sha,
-              size: f.size ?? null,
-              type: f.type,
-            },
-          });
+        if (f.type !== "blob") continue;
+
+        let contentText = "";
+
+        try {
+          const blob = await octokit.request(
+            "GET /repos/{owner}/{repo}/git/blobs/{sha}",
+            { owner, repo, sha: f.sha }
+          );
+
+          if (blob?.data?.content) {
+            contentText = Buffer.from(blob.data.content, "base64").toString(
+              "utf-8"
+            );
+          }
+        } catch (err) {
+          console.error("Blob fetch failed:", f.path, err);
         }
+
+        await prisma.file.create({
+          data: {
+            repo_id: savedRepo.repo_id,
+            path: f.path,
+            sha: f.sha,
+            size: f.size ?? null,
+            type: f.type,
+            content: contentText, 
+          },
+        });
       }
     }
 
-    const commits = await commitService.getCommits(owner, repo, token);
-    console.log("Commit count:", commits.length);
+    console.log("Files saved.");
 
+    const commits = await commitService.getCommits(owner, repo, token);
     await prisma.commit.deleteMany({ where: { repo_id: savedRepo.repo_id } });
 
     for (const c of commits) {
@@ -80,7 +93,9 @@ export const snapshotService = {
           repo_id: savedRepo.repo_id,
           author_name: c.commit?.author?.name || "",
           author_email: c.commit?.author?.email || "",
-          date: c.commit?.author?.date ? new Date(c.commit.author.date) : null,
+          date: c.commit?.author?.date
+            ? new Date(c.commit.author.date)
+            : null,
           message: c.commit?.message || "",
           parent_sha: c.parents?.[0]?.sha || null,
         },
@@ -88,15 +103,16 @@ export const snapshotService = {
     }
 
     const issues = await issueService.getIssues(owner, repo, token);
-    console.log("Issue count:", issues.length);
-
     await prisma.issue.deleteMany({ where: { repo_id: savedRepo.repo_id } });
 
     for (const issue of issues) {
       await prisma.issue.create({
         data: {
-          issue_id: issue.id,
+          issue_id: BigInt(issue.id),
           repo_id: savedRepo.repo_id,
+          issue_number: issue.number ?? null,
+          issue_url: issue.html_url ?? null,
+          author: issue.user ?? null,
           title: issue.title,
           state: issue.state,
           created_at: issue.created_at ? new Date(issue.created_at) : null,
@@ -106,8 +122,6 @@ export const snapshotService = {
     }
 
     const pulls = await pullService.getPullRequests(owner, repo, token);
-    console.log("Pull Request count:", pulls.length);
-
     await prisma.pull.deleteMany({ where: { repo_id: savedRepo.repo_id } });
 
     for (const p of pulls) {
@@ -122,7 +136,9 @@ export const snapshotService = {
         },
       });
     }
-    console.log("Snapshot complete:", savedRepo.repo_id);
+
+    console.log("Snapshot complete.");
+
     return {
       repoId: savedRepo.repo_id.toString(),
       treeFiles: tree.tree?.length ?? 0,

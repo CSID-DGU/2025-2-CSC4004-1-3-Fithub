@@ -24,15 +24,14 @@ export const githubDbController = {
 
   //get files
   async getRepoFiles(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { repoId } = req.params;
-      const files = await dbService.getRepoFiles(repoId);
-      return res.json(files);
-    } catch (error) {
-      next(error);
-    }
-  },
-
+  try {
+    const { repoId } = req.params;
+    const files = await dbService.getRepoFiles(repoId);
+    return res.json(files);
+  } catch (error) {
+    next(error);
+  }
+},
   //get file details
   async getFileDetail(req: Request, res: Response, next: NextFunction) {
     try {
@@ -136,32 +135,57 @@ export const githubDbController = {
     }
   },
 
-  //get issues (DB에 저장된 issue 목록)
   async getRepoIssues(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { repoId } = req.params;
-      const issues = await dbService.getRepoIssues(repoId);
-      return res.json(issues);
-    } catch (error) {
-      next(error);
-    }
-  },
+  try {
+    const { repoId } = req.params;
+    const issues = await dbService.getRepoIssues(repoId);
+
+    const formatted = issues.map(issue => ({
+      issueId: issue.issue_id,
+      issueNumber: issue.issue_number,
+      issueUrl: issue.issue_url,
+      author: issue.author,
+
+      title: issue.title,
+      state: issue.state,
+      createdAt: issue.created_at,
+      closedAt: issue.closed_at,
+    }));
+
+    return res.json(formatted);
+  } catch (error) {
+    next(error);
+  }
+},
 
   //get issue details
-  async getIssueDetail(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { repoId, issueId } = req.params;
-      const issue = await dbService.getIssueDetail(repoId, issueId);
+async getIssueDetail(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { repoId, issueId } = req.params;  
 
-      if (!issue) {
-        return res.status(404).json({ message: "Issue not found" });
-      }
+    const issue = await dbService.getIssueDetail(repoId, issueId);
 
-      return res.json(issue);
-    } catch (error) {
-      next(error);
+    if (!issue) {
+      return res.status(404).json({ message: "Issue not found" });
     }
-  },
+
+    const formatted = {
+      issueId: issue.issue_id,
+      issueNumber: issue.issue_number,
+      issueUrl: issue.issue_url,
+      author: issue.author,
+
+      title: issue.title,
+      state: issue.state,
+      createdAt: issue.created_at,
+      closedAt: issue.closed_at,
+    };
+
+    return res.json(formatted);
+  } catch (error) {
+    next(error);
+  }
+},
 
   //get pull requests (DB 저장된 pull 목록)
   async getRepoPulls(req: Request, res: Response, next: NextFunction) {
@@ -175,18 +199,20 @@ export const githubDbController = {
   },
 
   //get pull request details
-  async getPullDetail(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { repoId, pullId } = req.params;
-      const pull = await dbService.getPullDetail(repoId, pullId);
+async getPullDetail(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { repoId, pullId } = req.params;   // <-- 변환됨!
 
-      if (!pull) {
-        return res.status(404).json({ message: "Pull request not found" });
-      }
+    const pull = await dbService.getPullDetail(repoId, pullId);
 
-      return res.json(pull);
-    } catch (error) {
-      next(error);
+    if (!pull) {
+      return res.status(404).json({ message: "Pull request not found" });
     }
-  },
+
+    return res.json(pull);
+  } catch (error) {
+    next(error);
+  }
+}
+
 };

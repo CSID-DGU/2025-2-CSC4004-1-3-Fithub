@@ -76,10 +76,10 @@ router.get("/repos/:repoId", githubDbController.getRepo);
 router.get("/repos/:repoId/files/tree", githubDbController.getRepoFileTree);
 
 //File tree
-router.post("/repos/files/tree", requireAuth,githubDbController.getRepoFileTree);
+router.post("/repos/files/tree",githubDbController.getRepoFileTree);
 
 //File list
-router.get("/repos/:repoId/files", githubDbController.getRepoFiles);
+router.get("/repos/:repoId/files",githubDbController.getRepoFiles);
 
 //File detail
 router.get("/repos/:repoId/files/:fileId", githubDbController.getFileDetail);

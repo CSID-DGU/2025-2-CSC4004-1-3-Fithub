@@ -15,6 +15,13 @@ export const createProject = async (data: any) => {
   return project;
 };
 
+//프로젝트 목록 조회
+export const getProjectLists = async () => {
+  return prisma.project.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+};
+
 //프로젝트 상세정보 조회
 export const getProjectById = async (projectId: number) => {
   return prisma.project.findUnique({
@@ -34,7 +41,6 @@ export const getProjectById = async (projectId: number) => {
     },
   });
 };
-
 
 //프로젝트에 github 레포지토리 추가
 export const addRepoToProject = async (
@@ -80,30 +86,29 @@ export const addMemberToProject = async (projectId: number, userId: number) => {
 
 //프로젝트 삭제
 export const deleteProject = async (projectId: number) => {
-  //프로젝트 존재 여부 확인
+  // 프로젝트 존재 여부 확인
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
 
   if (!project) return null;
 
+  // 👉 1) projectRepository 먼저 삭제
   await prisma.projectRepository.deleteMany({
     where: { projectId },
   });
 
+  // 👉 2) projectMember 삭제 (이게 없으면 FK 에러 터짐)
+  await prisma.projectMember.deleteMany({
+    where: { projectId },
+  });
+
+  // 👉 3) 프로젝트 삭제
   await prisma.project.delete({
     where: { id: projectId },
   });
 
   return true;
-};
-
-export const getProjectLists = async () => {
-  const projects = await prisma.project.findMany({
-    orderBy: { createdAt: "desc" }, 
-  });
-
-  return projects;
 };
 
 

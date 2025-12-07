@@ -12,11 +12,14 @@ export const dbService = {
 
   //files
   async getRepoFiles(repoId: string) {
-    return prisma.file.findMany({
-      where: { repo_id: BigInt(repoId) },
-      orderBy: { path: "asc" },
-    });
-  },
+  return prisma.file.findMany({
+    where: { repo_id: BigInt(repoId) },
+    select: {
+      path: true,
+      content: true,   
+    }
+  });
+},
 
   //file details
   async getFileDetail(repoId: string, filePath: string) {
@@ -63,14 +66,14 @@ export const dbService = {
     });
   },
 
-  async getIssueDetail(repoId: string, issueId: string) {
-    return prisma.issue.findFirst({
-      where: {
-        repo_id: BigInt(repoId),
-        issue_id: Number(issueId),
-      },
-    });
-  },
+ async getIssueDetail(repoId: string, issueId: string) {
+  return prisma.issue.findFirst({
+    where: {
+      repo_id: BigInt(repoId),
+      issue_id: BigInt(issueId),   // 수정
+    },
+  });
+},
 
   //pull requests
   async getRepoPulls(repoId: string) {
@@ -81,11 +84,12 @@ export const dbService = {
   },
 
   async getPullDetail(repoId: string, pullId: string) {
-    return prisma.pull.findFirst({
-      where: {
-        repo_id: BigInt(repoId),
-        pull_id: Number(pullId),
-      },
-    });
-  },
+  return prisma.pull.findFirst({
+    where: {
+      repo_id: BigInt(repoId),
+      pull_id: BigInt(pullId),    // 수정
+    },
+  });
+}
+
 };

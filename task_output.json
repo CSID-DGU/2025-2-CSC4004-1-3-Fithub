@@ -1,0 +1,44 @@
+{
+    "recommendations": [
+        {
+            "target": "backend/src/server.ts",
+            "reason": "Security Alert: 'DATABASE_URL' is being logged to the console. This exposes credentials in logs.",
+            "priority": "High",
+            "type": "security",
+            "category": "Backend",
+            "confidence": 98
+        },
+        {
+            "target": "backend/src/server.ts",
+            "reason": "Cleanup: Remove temporary dummy route '/auth/github/dummy' as indicated by the comment.",
+            "priority": "Medium",
+            "type": "refactor",
+            "category": "Backend",
+            "confidence": 95
+        },
+        {
+            "target": "backend/src/server.ts",
+            "reason": "Security Warning: CORS is configured with 'origin: *'. Restrict this to trusted domains for production.",
+            "priority": "Medium",
+            "type": "security",
+            "category": "Backend",
+            "confidence": 90
+        },
+        {
+            "target": "agent/nodes.py",
+            "reason": "Refactor: 'nodes.py' is becoming a 'God Class' handling Network, ML, and File I/O. Split into 'ingestion.py', 'analysis.py', and 'synthesis.py'.",
+            "priority": "High",
+            "type": "refactor",
+            "category": "AI",
+            "confidence": 92
+        },
+        {
+            "target": "agent/nodes.py",
+            "reason": "Hardcoded Data: '_get_mock_files' contains hardcoded strings. Move this to a separate fixture file or config.",
+            "priority": "Low",
+            "type": "refactor",
+            "category": "AI",
+            "confidence": 85
+        }
+    ]
+}

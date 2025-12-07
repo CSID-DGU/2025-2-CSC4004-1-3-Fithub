@@ -1,40 +1,43 @@
 import { Request, Response } from "express";
-import {
-  generateAndSaveGraph,
-  getGraphByRepoId,
-} from "../github/services/aiGraphService";
+import { saveGraphToDB, getGraphByRepoId } from "../github/services/GraphService";
 
-export const createGraphController = async (req: Request, res: Response) => {
+export const uploadGraph = async (req: Request, res: Response) => {
   try {
-    const { repoId, summaries, embeddings, contextMeta } = req.body;
+    const { repoId, graph } = req.body;
 
-    if (!repoId || !summaries || !embeddings) {
-      return res.status(400).json({
-        error: "repoId, summaries, embeddings are required",
-      });
+    if (!repoId) {
+      return res.status(400).json({ error: "repoId is required" });
+    }
+    if (!graph || !graph.nodes || !graph.edges) {
+      return res.status(400).json({ error: "graph (nodes + edges) is required" });
     }
 
-    const result = await generateAndSaveGraph(BigInt(repoId), {
-      summaries,
-      embeddings,
-      contextMeta,
-    });
-
-    res.json(result);
+    const result = await saveGraphToDB(BigInt(repoId), graph);
+    return res.json(result);
   } catch (err: any) {
-    console.error("Graph generation error:", err);
-    res.status(500).json({ error: "Graph generation failed" });
+    console.error("uploadGraph error:", err);
+    return res.status(500).json({
+      error: "Failed to save graph",
+      details: err.message,
+    });
   }
 };
 
-export const getGraphController = async (req: Request, res: Response) => {
+export const fetchGraph = async (req: Request, res: Response) => {
   try {
-    const repoId = BigInt(req.params.repoId);
+    const { repoId } = req.params;
 
-    const graph = await getGraphByRepoId(repoId);
-    res.json(graph);
+    if (!repoId) {
+      return res.status(400).json({ error: "repoId param is required" });
+    }
+
+    const graphData = await getGraphByRepoId(BigInt(repoId));
+    return res.json(graphData);
   } catch (err: any) {
-    console.error("Graph fetch error:", err);
-    res.status(500).json({ error: "Graph fetch failed" });
+    console.error("fetchGraph error:", err);
+    return res.status(500).json({
+      error: "Failed to fetch graph",
+      details: err.message,
+    });
   }
 };

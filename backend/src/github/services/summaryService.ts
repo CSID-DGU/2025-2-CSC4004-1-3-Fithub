@@ -30,61 +30,41 @@ interface RepoSummaryParams {
 export const createRepoSummaries = async (params: RepoSummaryParams) => {
   const { repoId, projectId, repoName } = params;
 
-  if (!AI_SERVER) {
-    throw new Error("AI_SERVER 환경 변수가 설정되어 있지 않습니다.");
-  }
+  if (!AI_SERVER) throw new Error("AI_SERVER not set");
 
-  //request 
   const { data } = await axios.post<RepoAnalysisResponse>(`${AI_SERVER}/summarize/repo`, {
-    repo: {
-      repo_id: String(repoId),
-      name: repoName || "",
-    },
+    repo: { repo_id: String(repoId), name: repoName ?? "" },
     options: {},
-    thresholds: {
-      consistency_min: 0.7,
-      retry_max: 2,
-    }
+    thresholds: { consistency_min: 0.7, retry_max: 2 }
   });
 
-  if (!data.graph || !Array.isArray(data.graph.nodes)) {
-    throw new Error("AI 서버 응답에 graph.nodes가 없습니다.");
-  }
+  if (!data.graph?.nodes) throw new Error("AI response missing graph.nodes");
 
   const fileNodes = data.graph.nodes.filter((n) => n.type === "file");
 
-  const extractSummary = (node: GraphNode): string => {
-    return (
-      node.summary ||
-      node.summary_details?.logic ||
-      node.summary_details?.intent ||
-      node.summary_details?.structure ||
-      ""
-    );
-  };
+  const extractSummary = (node: GraphNode): string =>
+    node.summary ||
+    node.summary_details?.logic ||
+    node.summary_details?.intent ||
+    node.summary_details?.structure ||
+    "";
 
-  //db 저장
   const saved = await prisma.codeSummary.createMany({
     data: fileNodes.map((node) => ({
       projectId: projectId ?? 1,
       repo_id: BigInt(repoId),
-      targetId: node.id,      
-      level: "file",
       summaryText: extractSummary(node),
-    })),
-    skipDuplicates: true
+      runId: null,
+      modelName: null
+    }))
   });
 
-  return {
-    savedCount: saved.count,
-    files: fileNodes.length,
-  };
+  return { savedCount: saved.count, files: fileNodes.length };
 };
 
-//summary 조회
 export const getSummariesByProject = async (projectId: number) => {
   return prisma.codeSummary.findMany({
     where: { projectId },
-    include: { repository: true },
+    include: { repository: true }
   });
 };

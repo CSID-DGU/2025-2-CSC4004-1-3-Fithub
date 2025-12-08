@@ -158,7 +158,7 @@ class StructuralAnalyzer:
             # 1. 파일 검색 (Git, node_modules 등 제외)
             target_files = [
                 p for p in repo_path.rglob("*")
-                if p.suffix in valid_exts and not any(x in p.parts for x in ["node_modules", ".git", "venv", "dist", "build"])
+                if p.suffix in valid_exts and not any(x in p.parts for x in ["node_modules", ".git", "venv", ".venv", "dist", "build", "__pycache__"])
             ]
 
             logger.info(f"Analyzing structure for {len(target_files)} files...")
@@ -177,12 +177,57 @@ class StructuralAnalyzer:
                         "language": LanguageConfig.get_config(file_path.suffix)["name"]
                     })
 
-                    # 3. 내부 구조 파싱 (Polyglot Parser)
-                    parser = PolyglotParser(str(file_path))
-                    result = parser.parse(file_id)
-
-                    all_nodes.extend(result["nodes"])
-                    all_edges.extend(result["edges"])
+                    # 3. 내부 구조 파싱 (Polyglot Parser vs AST)
+                    if file_path.suffix == '.py':
+                        from shared.ast_utils import PythonASTAnalyzer
+                        tree = PythonASTAnalyzer.parse_file(str(file_path))
+                        if tree:
+                            funcs = PythonASTAnalyzer.extract_functions(tree)
+                            classes = PythonASTAnalyzer.extract_classes(tree)
+                            
+                            # Convert to Node format
+                            for name, info in funcs.items():
+                                nid = f"{file_id}::{name}"
+                                all_nodes.append({
+                                    "id": nid,
+                                    "type": "function",
+                                    "label": name,
+                                    "language": "Python",
+                                    "docstring": info.get("docstring", ""),
+                                    "args": info.get("args", [])
+                                })
+                                all_edges.append({"source": file_id, "target": nid, "relation": "defines"})
+                                
+                            for name, info in classes.items():
+                                nid = f"{file_id}::{name}"
+                                all_nodes.append({
+                                    "id": nid,
+                                    "type": "class",
+                                    "label": name,
+                                    "language": "Python",
+                                    "docstring": info.get("docstring", "")
+                                })
+                                all_edges.append({"source": file_id, "target": nid, "relation": "defines"})
+                                
+                            # Imports are handled by AST too if we want, but keeping regex for edges for now or merging?
+                            # Let's keep regex for imports for consistency across languages for now, 
+                            # or use AST imports. AST imports are better.
+                            imports = PythonASTAnalyzer.extract_imports(tree)
+                            for imp in imports['direct'] + imports['from']:
+                                target_hint = imp.split('.')[-1] + ".py"
+                                all_edges.append({"source": file_id, "target": target_hint, "relation": "imports"})
+                        else:
+                            # Fallback to regex if AST fails
+                            parser = PolyglotParser(str(file_path))
+                            result = parser.parse(file_id)
+                            all_nodes.extend(result["nodes"])
+                            all_edges.extend(result["edges"])
+                    else:
+                        # Other languages use PolyglotParser (Regex)
+                        parser = PolyglotParser(str(file_path))
+                        result = parser.parse(file_id)
+                        all_nodes.extend(result["nodes"])
+                        all_edges.extend(result["edges"])
 
                 except Exception as e:
                     logger.warning(f"Parse error {file_path.name}: {e}")

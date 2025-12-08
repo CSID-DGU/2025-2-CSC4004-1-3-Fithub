@@ -131,7 +131,10 @@ class GraphBuilder:
             G.add_node(nid,
                        label=node.get('label', nid.split('/')[-1]),
                        domain=meta.get('domain_tag', 'General'),  # Color
-                       layer=meta.get('layer', 'Module')  # Layout
+                       layer=meta.get('layer', 'Module'),  # Layout
+                       summary_text=node.get('summary_text', ''),
+                       summary_details=node.get('summary_details', {}),
+                       type=node.get('type', 'file')
                        )
             
             # 노드 속성에 점수 저장 (나중에 시각화용)
@@ -139,31 +142,141 @@ class GraphBuilder:
 
         # 3. 엣지 추가
         for edge in edges:
-            G.add_edge(edge['source'], edge['target'], type='physical')
+            G.add_edge(edge['source'], edge['target'], type=edge.get('type', 'physical'))
 
         for logic in context_metadata.get('logical_edges', []):
             G.add_edge(logic['source'], logic['target'], type='logical')
 
-        # 4. 최종 JSON 변환
-        final_nodes = []
+        # [NEW] Pre-process edges to find parent-child relationships for subgraphs (Defines)
+        parent_map = {}
+        for edge in edges:
+            if edge.get('type') == 'defines':
+                parent_map[edge['target']] = edge['source']
+
+        # 4. 최종 JSON 변환 + Directory Hierarchy Creation
+        final_nodes_map = {}
+        
+        # 4.1. Process existing nodes (Files, Classes, Functions)
         for nid in G.nodes:
             meta = G.nodes[nid]
             
             # Color Decision
             color = self._get_color(meta.get('domain', 'General'))
             
-            # Size Decision (RepoGraph Score 기반)
-            size = 20 + (meta.get('importance', 0.5) * 80) # 20 ~ 100
+            # Size Decision
+            base_size = 20
+            if meta.get('type') == 'file':
+                size = 20 + (meta.get('importance', 0.5) * 80) 
+            else:
+                size = 10 + (meta.get('importance', 0.5) * 20) 
 
-            final_nodes.append({
+            node_type = meta.get('type', 'file')
+            
+            # Calculate Parent if not 'defines' relationship
+            parent_id = parent_map.get(nid)
+            
+            # If no code-level parent (e.g., file), assign Directory Parent
+            if not parent_id:
+                if node_type == 'file':
+                    # e.g., "agent/fusion.py" -> parent "agent"
+                    parts = nid.split('/')
+                    if len(parts) > 1:
+                        parent_id = "/".join(parts[:-1])
+                    else:
+                        parent_id = "ROOT"
+                elif '::' in nid:
+                     # [FIX] Force parent for functions/classes if 'defines' edge missed
+                     # e.g., "server.py::do_GET" -> parent "server.py"
+                     parent_id = nid.split('::')[0]
+
+            final_nodes_map[nid] = {
                 "id": nid,
                 "label": meta.get('label', nid),
                 "size": size,
                 "color": color,
-                "group": meta.get('layer', 'Unknown')
-            })
+                "group": meta.get('layer', 'Unknown'),
+                "type": node_type,
+                "parent": parent_id, 
+                "summary": meta.get('summary_text', ''),
+                "summary_details": meta.get('summary_details', {}),
+                "domain": meta.get('domain', 'General'),
+                "importance": meta.get('importance', 0.5)
+            }
+            
+        # 4.2. Create Directory Nodes Recursively
+        # We need to ensure all parent directories mentioned exist
+        existing_ids = set(final_nodes_map.keys())
+        dirs_to_create = set()
+        
+        # Collect needed directories from parents
+        for node in final_nodes_map.values():
+            pid = node.get('parent')
+            if pid and pid != "ROOT" and pid not in existing_ids:
+                dirs_to_create.add(pid)
+        
+        # Recursively add missing parents of directories
+        # Use a list to iterate and append new needed parents
+        queue = list(dirs_to_create)
+        processed_dirs = set()
+        
+        while queue:
+            current_dir = queue.pop(0)
+            if current_dir in processed_dirs or current_dir in existing_ids or current_dir == "ROOT":
+                continue
+            
+            processed_dirs.add(current_dir)
+            
+            # Create Node
+            final_nodes_map[current_dir] = {
+                "id": current_dir,
+                "label": current_dir.split('/')[-1],
+                "size": 15,
+                "color": "#333333",
+                "group": "Directory",
+                "type": "directory",
+                "parent": "ROOT" # Default, update below
+            }
+            
+            # Determine Parent of this directory
+            parts = current_dir.split('/')
+            if len(parts) > 1:
+                parent_dir = "/".join(parts[:-1])
+                final_nodes_map[current_dir]["parent"] = parent_dir
+                if parent_dir not in existing_ids and parent_dir not in processed_dirs:
+                    queue.append(parent_dir)
+            else:
+                final_nodes_map[current_dir]["parent"] = "ROOT"
 
-        return {"nodes": final_nodes, "edges": [{"source": u, "target": v, "type": d.get("type", "physical")} for u, v, d in G.edges(data=True)]}
+        # 4.3. Add ROOT Node explicitly? 
+        # User wanted "ROOT" explicitly.
+        if "ROOT" not in existing_ids:
+             final_nodes_map["ROOT"] = {
+                "id": "ROOT",
+                "label": "Fithub",
+                "size": 30,
+                "color": "#000000",
+                "group": "Root",
+                "type": "directory",
+                "parent": None
+            }
+            
+        final_nodes = list(final_nodes_map.values())
+        
+        # Add 'structure' edges for new directory hierarchy
+        final_edges = [{"source": u, "target": v, "type": d.get("type", "physical")} for u, v, d in G.edges(data=True)]
+        
+        # Add edges for implicit parent-child relationships (that aren't in G)
+        for node in final_nodes:
+            if node['parent']:
+                # Ensure parent exists (it should by now)
+                # Avoid duplicates if G already had edge? G likely didn't have directory edges.
+                final_edges.append({
+                    "source": node['parent'],
+                    "target": node['id'],
+                    "type": "structure"
+                })
+
+        return {"nodes": final_nodes, "edges": final_edges}
 
     def _get_color(self, domain):
         colors = {

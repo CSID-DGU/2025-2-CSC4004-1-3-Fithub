@@ -14,6 +14,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from .state import AgentState, log_node_execution
 from .config import Config
 from .fusion import fuse_data
+from .utils import save_mcp_result
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ async def fetch_from_backend_node(state: AgentState) -> Dict[str, Any]:
                     src_path, 
                     temp_dir, 
                     dirs_exist_ok=True, 
-                    ignore=shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.DS_Store')
+                    ignore=shutil.ignore_patterns('.git', '.venv', '__pycache__', '*.pyc', '.DS_Store', 'temp_repos', 'brain')
                 )
                 log_node_execution(state, "ingest", "success", time.time() - start_time)
                 return {"repo_path": str(temp_dir)}
@@ -117,6 +118,7 @@ async def summarize_node(state: AgentState) -> Dict[str, Any]:
         res = summ.summarize_repository(state["repo_path"])
 
         summaries = res.get("file_summaries", [])
+        save_mcp_result(state.get("run_id", "default"), "summarization", summaries)
         log_node_execution(state, "summarize", "success", time.time() - start_time)
         return {"initial_summaries": summaries}
     except Exception as e:
@@ -130,6 +132,7 @@ async def build_graph_node(state: AgentState) -> Dict[str, Any]:
     try:
         anlz = create_analyzer(device="cpu")
         res = anlz.analyze_repository(state["repo_path"])
+        save_mcp_result(state.get("run_id", "default"), "structural", res)
         log_node_execution(state, "build_graph", "success", time.time() - start_time)
         return {"code_graph_raw": res}
     except Exception as e:
@@ -144,8 +147,8 @@ async def embed_code_node(state: AgentState) -> Dict[str, Any]:
         repo_path = Path(state.get("repo_path"))
         snippets = []
 
-        # 실제 파일 읽기 (최대 20개 제한)
-        py_files = list(repo_path.rglob("*.py"))[:20]
+        # 실제 파일 읽기 (Config 제한 적용)
+        py_files = list(repo_path.rglob("*.py"))[:Config.MAX_ANALYSIS_FILES]
         for py_file in py_files:
             try:
                 with open(py_file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -170,6 +173,7 @@ async def embed_code_node(state: AgentState) -> Dict[str, Any]:
                 embeddings.append({"id": r["id"], "embedding": r["embedding"]})
 
         log_node_execution(state, "embed_code", "success", time.time() - start_time)
+        save_mcp_result(state.get("run_id", "default"), "embedding", embeddings)
         return {"embeddings": embeddings}
     except Exception as e:
         logger.error(f"Embed error: {e}")
@@ -248,6 +252,7 @@ async def analyze_repo_node(state: AgentState) -> Dict[str, Any]:
         analysis_result = analyzer.analyze(state.get("fused_data_package", {}))
 
         log_node_execution(state, "analyze_repo", "success", time.time() - start_time)
+        save_mcp_result(state.get("run_id", "default"), "repository_analysis", analysis_result)
         return {"context_metadata": analysis_result}
     except Exception as e:
         logger.error(f"Repo analysis error: {e}")
@@ -290,11 +295,27 @@ async def synthesize_node(state: AgentState) -> Dict[str, Any]:
         }
         tasks = rec.recommend(analysis_res)
 
+        # Coverage Statistics
+        total_files_found = state.get("context_metadata", {}).get("statistics", {}).get("total_files", 0)
+        # If context statistics missing, try to infer from graph
+        if total_files_found == 0:
+             total_files_found = len(state.get("final_graph_json", {}).get("nodes", []))
+
+        analyzed_count = len(state.get("initial_summaries", []))
+        coverage_pct = (analyzed_count / total_files_found * 100) if total_files_found > 0 else 0.0
+
         final_artifact = {
             "graph": state.get("final_graph_json"),
             "context": state.get("context_metadata"),
             "recommendations": tasks,
-            "metrics": state.get("metrics")
+            "metrics": {
+                **state.get("metrics", {}),
+                "coverage": {
+                    "total_files": total_files_found,
+                    "analyzed_files": analyzed_count,
+                    "percentage": round(coverage_pct, 1)
+                }
+            }
         }
 
         log_node_execution(state, "synthesize", "success", time.time() - start_time)

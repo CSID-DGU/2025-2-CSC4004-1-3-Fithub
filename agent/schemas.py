@@ -11,6 +11,7 @@ from datetime import datetime
 class RepoInput(BaseModel):
     repo_id: str = Field(..., description="Backend Repository ID")
     name: Optional[str] = Field(None, description="Repository Name")
+    local_path: Optional[str] = Field(None, description="Local Path for Testing")
 
 class Thresholds(BaseModel):
     consistency_min: float = 0.7

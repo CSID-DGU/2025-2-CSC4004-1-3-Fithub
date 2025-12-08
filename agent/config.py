@@ -31,9 +31,10 @@ class Config:
 
     # --- 🤖 Model Configurations (Verified for Free Tier) ---
 
-    # 1. [요약] Salesforce/codet5-base
-    # 이유: CodeT5+ 보다 구형이지만, HF Free API에서 호환성이 훨씬 좋음 (에러 확률 낮음)
-    MODEL_SUMMARIZER = "Salesforce/codet5-base"
+    # 1. [요약] Qwen/Qwen2.5-Coder-1.5B-Instruct
+    # 이유: 최신 소형 언어 모델로서 HF Inference API (무료) 지원이 원활하며 Chat API 호환됨.
+    # CodeT5는 text_generation API 호환성 문제(StopIteration)로 교체됨.
+    MODEL_SUMMARIZER = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
 
     # 2. [임베딩] microsoft/graphcodebert-base
     # 이유: 코드 임베딩의 표준. Feature Extraction API 지원이 확실함.
@@ -44,11 +45,7 @@ class Config:
     MODEL_LLM_OPENAI = "gpt-4o" # OpenAI 사용 시 기본 모델
 
     # --- 🤖 Ensemble Summarization Models ---
-    # Logic Expert: 기능 요약 (입출력, 알고리즘)
-    MODEL_SUMMARIZER_LOGIC = "Salesforce/codet5-base"
-
-    # Intent Expert: 의도 분석 (비즈니스 로직, 존재 이유)
-    MODEL_SUMMARIZER_INTENT = "bigcode/starcoder2-3b"
-
-    # Structure Expert: 구조적 특징 (AST 패턴, 디자인 패턴)
-    MODEL_SUMMARIZER_STRUCTURE = "microsoft/unixcoder-base"
+    # Qwen으로 통일 (Role Prompting으로 관점 분리)
+    MODEL_SUMMARIZER_LOGIC = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+    MODEL_SUMMARIZER_INTENT = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+    MODEL_SUMMARIZER_STRUCTURE = "Qwen/Qwen2.5-Coder-1.5B-Instruct"

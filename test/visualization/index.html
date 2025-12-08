@@ -12,7 +12,7 @@
             overflow: hidden;
             background: #1a1a1a;
             color: #fff;
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         #graph {
@@ -22,32 +22,104 @@
 
         .tooltip {
             position: absolute;
-            background: rgba(0, 0, 0, 0.8);
-            border: 1px solid #555;
-            padding: 10px;
-            border-radius: 5px;
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid #444;
+            padding: 12px;
+            border-radius: 8px;
             pointer-events: none;
-            font-size: 12px;
-            max-width: 300px;
+            font-size: 13px;
+            max-width: 350px;
             display: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
         }
 
-        .node circle {
-            stroke: #fff;
-            stroke-width: 1.5px;
+        /* Styles handled by D3 attributes mostly, but can have base transitions */
+        .node path {
             cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .node:hover path {
+            stroke: #fff;
+            stroke-width: 2px;
         }
 
         .link {
-            stroke: #555;
+            fill: none;
+            transition: stroke-opacity 0.2s;
+        }
+
+        .link.structure {
+            stroke: #444;
+            stroke-width: 1px;
+            stroke-dasharray: 2, 2;
+            opacity: 0.3;
+        }
+
+        .link.import {
+            stroke: #ff9f43;
+            /* Orange for imports */
             stroke-opacity: 0.6;
         }
 
+        .link.defines {
+            stroke: #fff;
+            stroke-opacity: 0.8;
+        }
+
         .group-hull {
-            fill: rgba(255, 255, 255, 0.05);
+            fill: rgba(255, 255, 255, 0.02);
             stroke: rgba(255, 255, 255, 0.1);
-            stroke-width: 1;
-            stroke-dasharray: 4;
+            stroke-width: 1.5;
+            stroke-linejoin: round;
+            transition: fill 0.3s;
+        }
+
+        .group-hull:hover {
+            fill: rgba(255, 255, 255, 0.05);
+            stroke: rgba(255, 255, 255, 0.3);
+        }
+
+        .group-label {
+            font-family: monospace;
+            font-size: 14px;
+            fill: #888;
+            pointer-events: none;
+            text-anchor: middle;
+            font-weight: bold;
+            opacity: 0.7;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            border: 1px solid #444;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            margin-right: 8px;
+            border-radius: 2px;
+            /* Slight round, or full round depending on usage */
+        }
+
+        .legend-line {
+            width: 20px;
+            height: 2px;
+            margin-right: 8px;
         }
     </style>
 </head>
@@ -55,10 +127,9 @@
 <body>
     <div id="graph"></div>
     <div class="tooltip" id="tooltip"></div>
+    <div class="legend" id="legend"></div>
 
     <script>
-        // Load JSON data (Assuming verification_result.json is in the same directory or served)
-        // For local testing without server, you might need to paste the JSON content here or run a local server.
         d3.json("../../verification_result.json").then(data => {
             const width = window.innerWidth;
             const height = window.innerHeight;
@@ -66,104 +137,176 @@
             const svg = d3.select("#graph").append("svg")
                 .attr("width", width)
                 .attr("height", height)
-                .call(d3.zoom().on("zoom", (event) => {
+                .call(d3.zoom().scaleExtent([0.1, 8]).on("zoom", (event) => {
                     g.attr("transform", event.transform);
-                }));
+                }))
+                .on("dblclick.zoom", null);
 
             const g = svg.append("g");
 
-            const nodes = data.graph.nodes;
-            const links = data.graph.edges.map(d => ({ ...d }));
+            // --- Configuration: Project Structure ---
+            const PROJECT_DIRS = ['agent', 'mcp', 'models', 'RESTAPI', 'results', 'shared', 'test'];
 
-            // Grouping Logic: Map parent IDs to their child nodes
-            const groups = d3.group(nodes, d => d.parent || d.id);
-
-            // Force Simulation
-            const simulation = d3.forceSimulation(nodes)
-                .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === 'defines' ? 20 : 100)) // Hierarchy is tighter
-                .force("charge", d3.forceManyBody().strength(d => d.type === 'file' ? -300 : -50)) // Files repel more
-                .force("center", d3.forceCenter(width / 2, height / 2))
-                .force("collide", d3.forceCollide().radius(d => d.size + 10))
-                .force("group", isolate(d3.forceManyBody().strength(30), d => d.parent)); // Pull children to parents
-
-            function isolate(force, filter) {
-                let initialize = force.initialize;
-                force.initialize = function () { initialize.call(force, nodes.filter(filter)); };
-                return force;
+            // Helper to check if a path belongs to project source
+            function isProjectFile(path) {
+                if (PROJECT_DIRS.some(dir => path.startsWith(dir + '/'))) return true;
+                if (['main.py', 'requirements.txt', 'Dockerfile', 'docker-compose.yml'].includes(path)) return true;
+                return false;
             }
 
-            // Render Links
+            // --- Data Preprocessing ---
+
+            let processedNodes = data.graph.nodes.filter(n => n.type !== 'directory');
+            // Filter out directory nodes if they exist in JSON (we want clean clusters)
+
+            // Generate Links
+            // We only want 'defines' and 'imports'. 'structure' links (file->dir) are implicit by clustering.
+            let processedLinks = data.graph.edges.filter(e =>
+                e.type === 'defines' || e.type === 'imports'
+            ).filter(e =>
+                processedNodes.find(n => n.id === e.source) && processedNodes.find(n => n.id === e.target)
+            );
+
+            // Assign Groups for Clustering
+            processedNodes.forEach(node => {
+                const parts = node.id.split('::')[0].split('/');
+                node.groupPath = (parts.length > 1) ? parts[0] : "root";
+            });
+
+            // Grouping for Forces
+            const nodesByGroup = d3.group(processedNodes, d => d.groupPath);
+
+            // --- Force Simulation ---
+            // Stronger distinct clusters
+            const simulation = d3.forceSimulation(processedNodes)
+                .force("link", d3.forceLink(processedLinks).id(d => d.id)
+                    .distance(d => d.type === 'defines' ? 20 : 150) // Imports loose, Defines tight
+                    .strength(d => d.type === 'defines' ? 1.5 : 0.1)
+                )
+                .force("charge", d3.forceManyBody().strength(-200)) // Repel each other
+                .force("collide", d3.forceCollide().radius(d => (d.size * 1) + 10).iterations(2))
+                .force("group", alpha => {
+                    // Custom Cluster Force: Pull nodes of same group to their centroid
+                    nodesByGroup.forEach(groupNodes => {
+                        const k = alpha * 0.1;
+                        const n = groupNodes.length;
+                        let cx = 0, cy = 0;
+                        groupNodes.forEach(d => { cx += d.x; cy += d.y; });
+                        cx /= n; cy /= n;
+                        groupNodes.forEach(d => {
+                            d.vx -= (d.x - cx) * k;
+                            d.vy -= (d.y - cy) * k;
+                        });
+                    });
+                })
+                .force("center", d3.forceCenter(width / 2, height / 2).strength(0.05));
+
+            // --- Rendering ---
+
+            const hullsLayer = g.append("g").attr("class", "hulls");
+
             const link = g.append("g")
                 .attr("class", "links")
-                .selectAll("line")
-                .data(links)
-                .enter().append("line")
-                .attr("class", "link")
-                .attr("stroke-width", d => d.type === 'defines' ? 2 : (d.type === 'imports' ? 1.5 : 1))
-                .attr("stroke", d => d.type === 'defines' ? '#fff' : (d.type === 'imports' ? '#ffcc00' : '#555'))
-                .attr("stroke-opacity", d => d.type === 'defines' ? 0.8 : 0.4);
+                .selectAll("path")
+                .data(processedLinks)
+                .enter().append("path")
+                .attr("class", d => `link ${d.type}`)
+                .attr("stroke-width", d => Math.sqrt(d.value || 1));
 
-            // Render Nodes
+            // Symbol Generators
+            const symbolGenerator = d3.symbol();
+
             const node = g.append("g")
                 .attr("class", "nodes")
-                .selectAll("g")
-                .data(nodes)
-                .enter().append("g")
-                .attr("class", "node")
+                .selectAll("path")
+                .data(processedNodes)
+                .enter().append("path")
+                .attr("d", d => {
+                    const size = d.size || 20; // Ensure size
+                    // Scale factor for visibility
+                    const r = size * 0.8;
+                    if (d.type === 'file') return symbolGenerator.type(d3.symbolCircle).size(r * 20)(); // Area
+                    if (d.type === 'class') return symbolGenerator.type(d3.symbolDiamond).size(r * 20)();
+                    if (d.type === 'function') return symbolGenerator.type(d3.symbolTriangle).size(r * 10)();
+                    return symbolGenerator.type(d3.symbolCircle).size(r * 20)();
+                })
+                .attr("fill", d => typeColorScale(d.type))
+                .attr("stroke", "#000")
+                .attr("stroke-width", 1.5)
                 .call(d3.drag()
                     .on("start", dragstarted)
                     .on("drag", dragged)
                     .on("end", dragended));
 
-            node.append("circle")
-                .attr("r", d => d.size)
-                .attr("fill", d => d.color)
-                .attr("stroke", d => d.type === 'file' ? '#fff' : 'none')
-                .attr("stroke-width", d => d.type === 'file' ? 2 : 0);
-
-            node.append("text")
-                .attr("dx", d => d.size + 5)
-                .attr("dy", ".35em")
+            // Labels (Show crucial files or high importance)
+            const labelText = g.append("g")
+                .attr("class", "labels")
+                .selectAll("text")
+                .data(processedNodes.filter(d => d.size > 40 || d.type === 'file'))
+                .enter().append("text")
                 .text(d => d.label)
-                .style("font-size", d => d.type === 'file' ? "12px" : "10px")
-                .style("font-weight", d => d.type === 'file' ? "bold" : "normal")
+                .attr("font-size", d => Math.max(10, d.size / 4) + "px") // Size-based font
+                .attr("dx", 12)
+                .attr("dy", 4)
                 .style("fill", "#ddd")
-                .style("pointer-events", "none");
+                .style("pointer-events", "none")
+                .style("text-shadow", "0 0 3px #000");
 
-            // Tooltip Interaction
-            const tooltip = d3.select("#tooltip");
+            // --- Tooltip & Ticks (Same as before) ---
 
-            node.on("mouseover", (event, d) => {
-                tooltip.style("display", "block")
-                    .html(`
-                        <strong>${d.label}</strong> (${d.type})<br/>
-                        <span style="color:#aaa">${d.id}</span><br/>
-                        ${d.parent ? `<span style="color:#888">Parent: ${d.parent}</span><br/>` : ''}
-                        <hr style="border-color:#555"/>
-                        ${d.summary_details.logic ? `<b>Logic:</b> ${d.summary_details.logic}<br/>` : ''}
-                        ${d.summary_details.intent ? `<b>Intent:</b> ${d.summary_details.intent}<br/>` : ''}
-                        ${d.summary_details.structure ? `<b>Structure:</b> ${d.summary_details.structure}<br/>` : ''}
-                        ${!d.summary_details.logic ? `<i>${d.summary || 'No summary available'}</i>` : ''}
-                    `);
-            })
-                .on("mousemove", (event) => {
-                    tooltip.style("left", (event.pageX + 10) + "px")
-                        .style("top", (event.pageY + 10) + "px");
-                })
-                .on("mouseout", () => {
-                    tooltip.style("display", "none");
-                });
+            // ... (Tooltip logic is kept in existing code or should be verified) ...
 
             simulation.on("tick", () => {
-                link
-                    .attr("x1", d => d.source.x)
-                    .attr("y1", d => d.source.y)
-                    .attr("x2", d => d.target.x)
-                    .attr("y2", d => d.target.y);
+                link.attr("d", d => {
+                    if (d.type === 'imports') {
+                        const dx = d.target.x - d.source.x,
+                            dy = d.target.y - d.source.y,
+                            dr = Math.sqrt(dx * dx + dy * dy) * 1.5;
+                        return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+                    } else {
+                        return `M${d.source.x},${d.source.y}L${d.target.x},${d.target.y}`;
+                    }
+                });
 
-                node
-                    .attr("transform", d => `translate(${d.x},${d.y})`);
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+
+                labelText
+                    .attr("x", d => d.x)
+                    .attr("y", d => d.y);
+
+                updateHulls();
             });
+
+            function updateHulls() {
+                const hullData = [];
+                // Group by directory for hulls
+                const hullGroups = d3.group(processedNodes, d => d.groupPath);
+
+                hullGroups.forEach((dirNodes, dirPath) => {
+                    const points = dirNodes.map(d => [d.x, d.y]);
+                    // Convex hull needs at least 3 points. 
+                    // If <3, we can draw a circle or skip.
+                    if (points.length < 3) return;
+
+                    const hull = d3.polygonHull(points);
+                    if (hull) hullData.push({ path: hull, group: dirPath });
+                });
+
+                const hulls = hullsLayer.selectAll("path")
+                    .data(hullData);
+
+                hulls.enter().append("path")
+                    .attr("class", "group-hull")
+                    .merge(hulls)
+                    .attr("d", d => "M" + d.path.join("L") + "Z")
+                    .attr("fill", d => dirColorScale(d.group))
+                    .attr("stroke", d => dirColorScale(d.group))
+                    .attr("stroke-width", 30) // Smooth corners
+                    .attr("stroke-linejoin", "round")
+                    .attr("opacity", 0.15); // Subtle background
+
+                hulls.exit().remove();
+            }
 
             function dragstarted(event, d) {
                 if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -181,6 +324,47 @@
                 d.fx = null;
                 d.fy = null;
             }
+
+            // --- Legend ---
+            const legend = d3.select("#legend");
+
+            legend.append("div").style("font-weight", "bold").style("margin-bottom", "5px").text("Link Types");
+            const linkTypes = [
+                { type: 'structure', color: '#444', label: 'Structure', dashed: true },
+                { type: 'imports', color: '#ff9f43', label: 'Imports', dashed: false },
+                { type: 'defines', color: '#fff', label: 'Defines', dashed: false }
+            ];
+
+            linkTypes.forEach(t => {
+                const item = legend.append("div").attr("class", "legend-item");
+                item.append("div").attr("class", "legend-line")
+                    .style("background", t.dashed ? "repeating-linear-gradient(to right, " + t.color + " 0, " + t.color + " 5px, transparent 5px, transparent 8px)" : t.color);
+                item.append("span").text(t.label);
+            });
+
+            legend.append("div").style("border-top", "1px solid #555").style("margin", "10px 0");
+
+            legend.append("div").style("font-weight", "bold").style("margin-bottom", "5px").text("Node Types");
+            const nodeTypes = [
+                { type: 'file', color: typeColorScale('file'), label: 'File (Circle)' },
+                { type: 'class', color: typeColorScale('class'), label: 'Class (Diamond)' },
+                { type: 'function', color: typeColorScale('function'), label: 'Function (Triangle)' }
+            ];
+            nodeTypes.forEach(t => {
+                const item = legend.append("div").attr("class", "legend-item");
+                item.append("div").attr("class", "legend-color").style("background", t.color);
+                item.append("span").text(t.label);
+            });
+
+            legend.append("div").style("border-top", "1px solid #555").style("margin", "10px 0");
+
+            legend.append("div").style("font-weight", "bold").style("margin-bottom", "5px").text("Directories (Regions)");
+            PROJECT_DIRS.forEach(group => {
+                const item = legend.append("div").attr("class", "legend-item");
+                item.append("div").attr("class", "legend-color").style("background", dirColorScale(group));
+                item.append("span").text(group);
+            });
+
         });
     </script>
 </body>

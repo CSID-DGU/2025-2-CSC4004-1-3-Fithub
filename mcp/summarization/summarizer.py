@@ -236,8 +236,23 @@ class CodeSummarizer:
             logger.warning(f"Quality calculation failed: {e}")
             return 0.7  # 기본값
 
+
+    def _generate_summary_via_chat(self, prompt: str, model_id: str) -> str:
+        """HF Chat Completion API 호출 (Instruct 모델용)"""
+        messages = [{"role": "user", "content": prompt}]
+        try:
+            response = self.client.chat_completion(
+                messages,
+                model=model_id,
+                max_tokens=200,
+                temperature=0.2
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            raise e
+
     def _generate_summary(self, code: str, model_id: str, prompt_type: str = "general") -> str:
-        """HF API 호출 (프롬프트 타입 기반)"""
+        """HF API 호출 (프롬프트 타입 기반, Text-Gen 및 Chat 지원)"""
         prompts = {
             "logic": f"Summarize the function inputs, outputs, and core algorithm in one sentence:\n\n{code}",
             "intent": f"Explain the business purpose and why this code exists in one sentence:\n\n{code}",
@@ -247,25 +262,47 @@ class CodeSummarizer:
 
         prompt = prompts.get(prompt_type, prompts["general"])
 
-        try:
-            response = self.client.text_generation(
-                prompt,
-                model=model_id,
-                max_new_tokens=100,
-                temperature=0.2,
-                do_sample=False
-            )
-            return response.strip()
-        except Exception as e:
-            logger.error(f"HF API Error ({model_id}, {prompt_type}): {e}")
-            # [Fallback] Mock Summary for Demo/Testing when API is unavailable
-            mock_summaries = {
-                "logic": "Analyzes input data and transforms it using a core algorithm to produce the desired output.",
-                "intent": "Facilitates data processing to support the main business logic of the application.",
-                "structure": "Modular function designed with error handling and clean separation of concerns.",
-                "general": "Handles core functionality with robust error checking and data validation."
-            }
-            return mock_summaries.get(prompt_type, "Summary generation failed.")
+        # [SAFE MODE] Throttling & Retry (Aggressive)
+        import time
+        max_retries = 3
+        base_delay = 5.0
+
+        is_chat_model = "instruct" in model_id.lower() or "chat" in model_id.lower() or "qwen" in model_id.lower()
+
+        for attempt in range(max_retries):
+            try:
+                # Throttling
+                wait_time = base_delay * (attempt + 1)
+                if attempt > 0:
+                    logger.warning(f"Throttling HF API: Waiting {wait_time}s before retry {attempt+1}...")
+                    time.sleep(wait_time) 
+                
+                if is_chat_model:
+                     return self._generate_summary_via_chat(prompt, model_id)
+                else:
+                    response = self.client.text_generation(
+                        prompt,
+                        model=model_id,
+                        max_new_tokens=100,
+                        temperature=0.2,
+                        do_sample=False
+                    )
+                    return response.strip()
+
+            except Exception as e:
+                logger.warning(f"HF API Attempt {attempt+1}/{max_retries} failed ({model_id}): {e}")
+                if attempt == max_retries - 1:
+                    break # Final failure, proceed to fallback
+
+        # [Fallback] Mock Summary for Demo/Testing when API is unavailable
+        logger.error(f"HF API Failed after {max_retries} attempts. Using Fallback.")
+        mock_summaries = {
+            "logic": "Analyzes input data and transforms it using a core algorithm to produce the desired output.",
+            "intent": "Facilitates data processing to support the main business logic of the application.",
+            "structure": "Modular function designed with error handling and clean separation of concerns.",
+            "general": "Handles core functionality with robust error checking and data validation."
+        }
+        return mock_summaries.get(prompt_type, "Summary generation failed.")
 
 def create_summarizer(device: Optional[str] = None) -> CodeSummarizer:
     return CodeSummarizer(device=device)

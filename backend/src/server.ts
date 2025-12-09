@@ -7,11 +7,10 @@ import helmet from "helmet";
 import githubRoutes from "./routes/githubRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import projectRoutes from "./routes/projectRoutes";
+import analysisRoutes from "./routes/analysisRoutes";
 import summaryRoutes from "./routes/summaryRoutes";
-import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
 import authRoutes from "./routes/authRoutes";
-import graphRoutes from "./routes/graphRoutes";
 import YAML from "yamljs";
 
 
@@ -42,10 +41,9 @@ app.get("/health", (_req, res) => {
 app.use("/auth", authRoutes);                 
 app.use("/projects", projectRoutes);  
 app.use("/users",userRoutes);      
-app.use("/summaries", summaryRoutes);
-app.use("/tasks", taskRoutes);
+app.use("/analysis", analysisRoutes);
+app.use("/summary",summaryRoutes);
 app.use("/github", githubRoutes);
-app.use("/graph",graphRoutes);
 app.use(errorHandler);
 
 app.get("/", (_req, res) => {

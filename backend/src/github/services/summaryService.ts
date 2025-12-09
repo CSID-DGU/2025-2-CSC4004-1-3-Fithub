@@ -1,70 +1,119 @@
-import axios from "axios";
+// src/services/summaryService.ts
+
+import fs from "fs";
+import path from "path";
 import prisma from "../../prisma";
 
-const AI_SERVER = process.env.AI_SERVER;
-
-interface GraphNode {
-  id: string;
-  type: string;
-  summary?: string;
-  summary_details?: {
+// summarization.json의 단일 아이템 구조 타입
+interface SummaryItemRaw {
+  code_id?: string;
+  text?: string;
+  unified_summary?: string;
+  level?: string;
+  quality_score?: number;
+  expert_views?: {
     logic?: string;
     intent?: string;
     structure?: string;
   };
 }
 
-interface RepoAnalysisResponse {
-  graph: {
-    nodes: GraphNode[];
-    edges: any[];
-  };
-}
+export const summaryService = {
 
-interface RepoSummaryParams {
-  repoId: bigint | number;
-  projectId?: number;
-  repoName?: string;
-}
+  /* ==========================================================
+     1) summarization.json → Summary + SummaryItem 저장
+  ========================================================== */
+  async saveSummaryFromResult(runId: string, repoId: bigint) {
+    try {
+      console.log("=================================================");
+      console.log("[SUMMARY] saveSummaryFromResult()");
+      console.log(" runId =", runId, ", repoId =", repoId);
+      console.log("=================================================");
 
-export const createRepoSummaries = async (params: RepoSummaryParams) => {
-  const { repoId, projectId, repoName } = params;
+      // 1) summarization.json 파일 경로
+      const baseDir = path.join(__dirname, "../../results", runId);
+      const summaryPath = path.join(baseDir, "summarization.json");
 
-  if (!AI_SERVER) throw new Error("AI_SERVER not set");
+      if (!fs.existsSync(summaryPath)) {
+        throw new Error(`summarization.json not found for runId=${runId}`);
+      }
 
-  const { data } = await axios.post<RepoAnalysisResponse>(`${AI_SERVER}/summarize/repo`, {
-    repo: { repo_id: String(repoId), name: repoName ?? "" },
-    options: {},
-    thresholds: { consistency_min: 0.7, retry_max: 2 }
-  });
+      // 2) summarization.json 읽기
+      const raw = JSON.parse(fs.readFileSync(summaryPath, "utf-8"));
 
-  if (!data.graph?.nodes) throw new Error("AI response missing graph.nodes");
+      if (!Array.isArray(raw)) {
+        throw new Error("summarization.json must contain an array of items");
+      }
 
-  const fileNodes = data.graph.nodes.filter((n) => n.type === "file");
+      console.log(`[SUMMARY] Loaded ${raw.length} summary items`);
 
-  const extractSummary = (node: GraphNode): string =>
-    node.summary ||
-    node.summary_details?.logic ||
-    node.summary_details?.intent ||
-    node.summary_details?.structure ||
-    "";
+      // 3) Summary 생성 (runId + repoId)
+      const summary = await prisma.summary.create({
+        data: {
+          runId,
+          repoId
+        },
+      });
 
-  const saved = await prisma.codeSummary.createMany({
-    data: fileNodes.map((node) => ({
-      projectId: projectId ?? 1,
-      repo_id: BigInt(repoId),
-      summaryText: extractSummary(node),
-      runId: null,
-      modelName: null
-    }))
-  });
+      console.log("[SUMMARY] Created Summary ID =", summary.id);
 
-  return { savedCount: saved.count, files: fileNodes.length };
-};
+      // 4) SummaryItem 생성 (배열 매핑)
+      const itemsData = raw.map((item: SummaryItemRaw) => ({
+        summaryId: summary.id,
+        codeId: item.code_id || null,
+        text: item.text || null,
+        unifiedSummary: item.unified_summary || null,
+        level: item.level || null,
+        qualityScore: item.quality_score || null,
+        logic: item.expert_views?.logic || null,
+        intent: item.expert_views?.intent || null,
+        structure: item.expert_views?.structure || null,
+      }));
 
-export const getSummariesByProject = async (projectId: number) => {
-  return prisma.codeSummary.findMany({
-    where: { projectId },
-    include: { repository: true }
-  });
+      await prisma.summaryItem.createMany({ data: itemsData });
+
+      console.log("[SUMMARY] SummaryItem 저장 개수 =", itemsData.length);
+
+      return {
+        summaryId: summary.id,
+        items: itemsData.length,
+      };
+
+    } catch (err) {
+      console.error("[SUMMARY SERVICE ERROR] saveSummaryFromResult:", err);
+      throw err;
+    }
+  },
+
+  /* ==========================================================
+     2) runId로 Summary + Items 조회
+  ========================================================== */
+  async getSummaryByRunId(runId: string) {
+    return prisma.summary.findUnique({
+      where: { runId },
+      include: { items: true },
+    });
+  },
+
+  /* ==========================================================
+     3) repoId 기준 최신 Summary
+  ========================================================== */
+  async getLatestSummary(repoId: bigint) {
+    return prisma.summary.findFirst({
+      where: { repoId },
+      orderBy: { createdAt: "desc" },
+      include: { items: true },
+    });
+  },
+
+  /* ==========================================================
+     4) repoId 기준 전체 Summary
+  ========================================================== */
+  async getAllSummaries(repoId: bigint) {
+    return prisma.summary.findMany({
+      where: { repoId },
+      orderBy: { createdAt: "desc" },
+      include: { items: true },
+    });
+  },
 };

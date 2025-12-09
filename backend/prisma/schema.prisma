@@ -42,23 +42,15 @@ model repository {
   pulls   pull[]
 
   projectRepositories ProjectRepository[]
-  codeSummaries       CodeSummary[]
-  tasks               Task[]
-
   summaries   Summary[]
-  embeddings  Embedding[]
-  contextMeta ContextMeta?
-  graph       Graph?
-
-  graphNodes  GraphNode[]   // <- FIXED: reverse relation
-  graphEdges  GraphEdge[]   // <- FIXED: reverse relation
+  tasks               Task[]
 }
 
 model commit {
   commit_sha   String    @id @db.VarChar(255)
   repo_id      BigInt?
   author_name  String?   @db.VarChar(255)
-  author_email String?   @db.VarChar(255)   // <- FIXED typo
+  author_email String?   @db.VarChar(255)   
   date         DateTime? @db.Timestamp(6)
   message      String?
   parent_sha   String?   @db.VarChar(255)
@@ -112,7 +104,6 @@ model Project {
   owner   User    @relation("UserOwnedProjects", fields: [ownerId], references: [id], onDelete: Cascade)
   members ProjectMember[]
   repos   ProjectRepository[]
-  summaries CodeSummary[]
   tasks     Task[]
   createdAt DateTime @default(now())
 }
@@ -179,106 +170,30 @@ model Task {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
-
-model CodeSummary {
-  id          Int      @id @default(autoincrement())
-  projectId   Int
-  repo_id     BigInt?
-  runId       String?
-  summaryText String
-  modelName   String?
-  createdAt   DateTime @default(now())
-
-  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  repository  repository? @relation(fields: [repo_id], references: [repo_id], onDelete: SetNull)
-}
-
 model Summary {
-  id        Int      @id @default(autoincrement())
-  repo_id   BigInt
-  filePath  String
-  summary   String
-  keywords  String[]
-  quality   Float?
+  id        Int        @id @default(autoincrement())
+  runId     String    @unique
+  repoId    BigInt
+  repository repository @relation(fields: [repoId], references: [repo_id])
+
+  items     SummaryItem[]
   createdAt DateTime @default(now())
-
-  repository repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
-  embedding  Embedding?
 }
 
-model Embedding {
-  id          Int     @id @default(autoincrement())
-  summaryId   Int     @unique
-  fusedVector Json
-  rawEdges    Json
 
-  summary     Summary    @relation(fields: [summaryId], references: [id])
-  repo_id     BigInt
-  repository  repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
-}
+model SummaryItem {
+  id              Int        @id @default(autoincrement())
+  summaryId       Int
 
-model ContextMeta {
-  id        Int      @id @default(autoincrement())
-  repo_id   BigInt   @unique
-  metaJson  Json
-  createdAt DateTime @default(now())
+  codeId          String?
+  text            String?
+  unifiedSummary  String?
+  level           String?
+  qualityScore    Float?
 
-  repository repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
-}
+  logic           String?
+  intent          String?
+  structure       String?
 
-model Graph {
-  id        Int      @id @default(autoincrement())
-  repo_id   BigInt   @unique
-  createdAt DateTime @default(now())
-
-  repository repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
-  nodes      GraphNode[]
-  edges      GraphEdge[]
-}
-
-model GraphNode {
-  id            BigInt   @id @default(autoincrement())
-  repo_id       BigInt
-  graphId       Int
-
-  external_id   String
-  label         String
-  type          String?
-  parent        String?
-  size          Float?
-  color         String?
-  group         String?
-
-  summary       String?
-  logic         String?
-  intent        String?
-  structure     String?
-
-  domain        String?
-  importance    Float?
-
-  createdAt     DateTime @default(now())
-
-  graph         Graph      @relation(fields: [graphId], references: [id])
-  repository    repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
-
-  edges_out     GraphEdge[] @relation("node_out")
-  edges_in      GraphEdge[] @relation("node_in")
-}
-
-model GraphEdge {
-  id        BigInt   @id @default(autoincrement())
-  repo_id   BigInt
-  graphId   Int
-
-  from_id   BigInt
-  to_id     BigInt
-  relation  String
-  metadata  Json?
-
-  from      GraphNode  @relation("node_out", fields: [from_id], references: [id])
-  to        GraphNode  @relation("node_in", fields: [to_id], references: [id])
-
-  graph     Graph      @relation(fields: [graphId], references: [id])
-  repository repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+  summary Summary @relation(fields: [summaryId], references: [id], onDelete: Cascade)
 }

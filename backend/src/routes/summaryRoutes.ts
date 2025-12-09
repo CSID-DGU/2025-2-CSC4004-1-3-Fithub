@@ -1,11 +1,14 @@
-import { Router } from "express";
-import {summarizeRepository, getSummaries} from "../controller/summaryController";
+// src/routes/summaryRoutes.ts
 
-import { requireAuth } from "../middleware/authMiddleware";
-import { requireProjectMember } from "../middleware/projectAuth";
+import { Router } from "express";
+import { getSummaryByRunId } from "../controller/summaryController";
 
 const router = Router();
 
-router.post("/",requireAuth,summarizeRepository);
-router.get("/:projectId",requireAuth,requireProjectMember,getSummaries);
+/**
+ * GET /summary/:runId
+ * runId 기반 Summary + SummaryItems 조회
+ */
+router.get("/:runId", getSummaryByRunId);
+
 export default router;

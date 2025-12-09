@@ -1,52 +1,65 @@
-import axios from "axios";
 import prisma from "../../prisma";
+import fs from "fs";
+import path from "path";
 
-const AI_SERVER = process.env.AI_SERVER;
+// category → role ENUM 매핑
+function mapCategoryToRole(category?: string) {
+  if (!category) return "COMMON";
 
-// AI 서버 호출
-export const requestAITasks = async (params: any) => {
-  const response = await axios.post(`${AI_SERVER}/task`, params);
-  return response.data.recommendations ?? response.data.tasks;
-};
+  const key = category.toLowerCase();
+  if (key.includes("backend")) return "BACKEND";
+  if (key.includes("frontend")) return "FRONTEND";
+  if (key.includes("ai")) return "AI";
+  if (key.includes("devops")) return "DEVOPS";
+  if (key.includes("database")) return "DATABASE";
 
-// DB 저장
-export const saveTasks = async (tasksFromAI: any[]) => {
-  const savedTasks = [];
+  return "COMMON";
+}
 
-  for (const t of tasksFromAI) {
-    const saved = await prisma.task.create({
-      data: {
-        title: t.title ?? t.target ?? "AI Task",
-        description: t.reason ?? t.description ?? "",
-        projectId: t.projectId,
-        repo_id: t.repoId ? BigInt(t.repoId) : null,
-        role: t.role ?? null,
-        source: "AI",
-        runId: t.runId ?? null,
-        target: t.target ?? null,
-        priority: t.priority ?? null,
-        taskType: t.type ?? null,
-        category: t.category ?? null,
-        confidence: t.confidence ?? null,
-      },
+export const taskService = {
+  //task_output.json -> db 저장
+  async saveTasksFromResult(runId: string, repoId: bigint, projectId: number) {
+    const baseDir = path.join(__dirname, "../../../results", runId);
+    const taskFile = path.join(baseDir, "task_output.json");
+
+    if (!fs.existsSync(taskFile)) {
+      console.log("[TASK] No task_output.json found → skipping");
+      return;
+    }
+
+    const json = JSON.parse(fs.readFileSync(taskFile, "utf-8"));
+    const recommendations = json.recommendations || [];
+
+    const tasks = recommendations.map((rec: any) => ({
+      projectId,
+      repo_id: repoId,
+
+      //매핑
+      title: `${rec.type.toUpperCase()}: ${rec.target}`,
+      description: rec.reason || null,
+      target: rec.target || null,
+      priority: rec.priority || null,
+      taskType: rec.type || null,
+      category: rec.category || null,
+      confidence: rec.confidence || null,
+
+      //role 자동 매핑
+      role: mapCategoryToRole(rec.category),
+
+      source: "AI",
+      runId,
+    }));
+
+    await prisma.task.createMany({ data: tasks });
+
+    console.log(`[TASK] Saved ${tasks.length} AI tasks to DB.`);
+  },
+
+  //task 조회
+  async getTasksByRunId(runId: string) {
+    return prisma.task.findMany({
+      where: { runId },
+      orderBy: { id: "asc" }
     });
-
-    savedTasks.push(saved);
   }
-
-  return savedTasks;
-};
-
-// 역할별 조회
-export const getTasksForUserRole = async (role: string) => {
-  return prisma.task.findMany({
-    where: { role: role as any },
-  });
-};
-
-// 프로젝트별 조회
-export const getTasksByProject = async (projectId: number) => {
-  return prisma.task.findMany({
-    where: { projectId },
-  });
 };

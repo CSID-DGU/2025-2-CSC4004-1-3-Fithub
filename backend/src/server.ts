@@ -9,6 +9,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import projectRoutes from "./routes/projectRoutes";
 import analysisRoutes from "./routes/analysisRoutes";
 import summaryRoutes from "./routes/summaryRoutes";
+import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
 import authRoutes from "./routes/authRoutes";
 import YAML from "yamljs";
@@ -43,7 +44,9 @@ app.use("/projects", projectRoutes);
 app.use("/users",userRoutes);      
 app.use("/analysis", analysisRoutes);
 app.use("/summary",summaryRoutes);
+app.use("/task",taskRoutes);
 app.use("/github", githubRoutes);
+
 app.use(errorHandler);
 
 app.get("/", (_req, res) => {

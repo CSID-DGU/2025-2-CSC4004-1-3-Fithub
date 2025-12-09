@@ -1,10 +1,8 @@
-// src/services/summaryService.ts
-
 import fs from "fs";
 import path from "path";
 import prisma from "../../prisma";
 
-// summarization.json의 단일 아이템 구조 타입
+//summarization.json의 단일 아이템 구조
 interface SummaryItemRaw {
   code_id?: string;
   text?: string;
@@ -20,9 +18,8 @@ interface SummaryItemRaw {
 
 export const summaryService = {
 
-  /* ==========================================================
-     1) summarization.json → Summary + SummaryItem 저장
-  ========================================================== */
+  //summarization.json → db 저장
+
   async saveSummaryFromResult(runId: string, repoId: bigint) {
     try {
       console.log("=================================================");
@@ -30,7 +27,6 @@ export const summaryService = {
       console.log(" runId =", runId, ", repoId =", repoId);
       console.log("=================================================");
 
-      // 1) summarization.json 파일 경로
       const baseDir = path.join(__dirname, "../../results", runId);
       const summaryPath = path.join(baseDir, "summarization.json");
 
@@ -38,7 +34,6 @@ export const summaryService = {
         throw new Error(`summarization.json not found for runId=${runId}`);
       }
 
-      // 2) summarization.json 읽기
       const raw = JSON.parse(fs.readFileSync(summaryPath, "utf-8"));
 
       if (!Array.isArray(raw)) {
@@ -47,7 +42,6 @@ export const summaryService = {
 
       console.log(`[SUMMARY] Loaded ${raw.length} summary items`);
 
-      // 3) Summary 생성 (runId + repoId)
       const summary = await prisma.summary.create({
         data: {
           runId,
@@ -57,7 +51,6 @@ export const summaryService = {
 
       console.log("[SUMMARY] Created Summary ID =", summary.id);
 
-      // 4) SummaryItem 생성 (배열 매핑)
       const itemsData = raw.map((item: SummaryItemRaw) => ({
         summaryId: summary.id,
         codeId: item.code_id || null,
@@ -85,30 +78,15 @@ export const summaryService = {
     }
   },
 
-  /* ==========================================================
-     2) runId로 Summary + Items 조회
-  ========================================================== */
+  //summary 조회
   async getSummaryByRunId(runId: string) {
     return prisma.summary.findUnique({
       where: { runId },
       include: { items: true },
     });
   },
-
-  /* ==========================================================
-     3) repoId 기준 최신 Summary
-  ========================================================== */
-  async getLatestSummary(repoId: bigint) {
-    return prisma.summary.findFirst({
-      where: { repoId },
-      orderBy: { createdAt: "desc" },
-      include: { items: true },
-    });
-  },
-
-  /* ==========================================================
-     4) repoId 기준 전체 Summary
-  ========================================================== */
+  
+  //repoId 기준 전체 Summary
   async getAllSummaries(repoId: bigint) {
     return prisma.summary.findMany({
       where: { repoId },

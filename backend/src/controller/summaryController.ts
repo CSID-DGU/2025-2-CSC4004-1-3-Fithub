@@ -1,12 +1,7 @@
-// src/controller/summaryController.ts
-
 import { Request, Response } from "express";
 import { summaryService } from "../github/services/summaryService";
 
-/**
- * GET /summary/run/:runId
- * runId로 Summary + SummaryItems 조회
- */
+//summary 조회
 export const getSummaryByRunId = async (req: Request, res: Response) => {
   try {
     const { runId } = req.params;

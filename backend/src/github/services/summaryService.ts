@@ -22,11 +22,6 @@ export const summaryService = {
 
   async saveSummaryFromResult(runId: string, repoId: bigint) {
     try {
-      console.log("=================================================");
-      console.log("[SUMMARY] saveSummaryFromResult()");
-      console.log(" runId =", runId, ", repoId =", repoId);
-      console.log("=================================================");
-
       const baseDir = path.join(__dirname, "../../results", runId);
       const summaryPath = path.join(baseDir, "summarization.json");
 
@@ -65,7 +60,7 @@ export const summaryService = {
 
       await prisma.summaryItem.createMany({ data: itemsData });
 
-      console.log("[SUMMARY] SummaryItem 저장 개수 =", itemsData.length);
+      console.log("[SUMMARY] SummaryItem= ", itemsData.length);
 
       return {
         summaryId: summary.id,
@@ -73,7 +68,7 @@ export const summaryService = {
       };
 
     } catch (err) {
-      console.error("[SUMMARY SERVICE ERROR] saveSummaryFromResult:", err);
+      console.error("[SUMMARY SERVICE ERROR] saveSummaryFromResult: ", err);
       throw err;
     }
   },

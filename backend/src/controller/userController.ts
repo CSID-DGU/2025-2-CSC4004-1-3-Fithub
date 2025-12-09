@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 
 export const getMyGitHubProfile = async (req: AuthRequest, res: Response) => {
   try {
-    // 인증 정보 미존재
+    //인증 정보 미존재
     if (!req.user || !req.user.id) {
       return res.status(401).json({ error: "Unauthorized: user not found in token" });
     }
@@ -33,7 +33,7 @@ export const getMyGitHubProfile = async (req: AuthRequest, res: Response) => {
   } catch (err: any) {
     console.error("Get GitHub profile error:", err);
 
-    // 📌 Prisma Known Request Error
+    //Prisma Known Request Error
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       return res.status(400).json({
         error: "Database error",
@@ -42,7 +42,7 @@ export const getMyGitHubProfile = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // 📌 Prisma Validation Error
+    //Prisma Validation Error
     if (err instanceof Prisma.PrismaClientValidationError) {
       return res.status(400).json({
         error: "Database validation error",
@@ -50,7 +50,7 @@ export const getMyGitHubProfile = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // 📌 Prisma Unknown Error
+    //Prisma Unknown Error
     if (err instanceof Prisma.PrismaClientUnknownRequestError) {
       return res.status(500).json({
         error: "Unknown database error",
@@ -58,7 +58,7 @@ export const getMyGitHubProfile = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // 📌 기본 Fallback
+    //기본 Fallback
     return res.status(500).json({
       error: "Internal server error while fetching profile",
       message: err.message || "Unknown server error",

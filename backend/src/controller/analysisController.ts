@@ -2,7 +2,6 @@ import axios from "axios";
 import fs from "fs";
 import path from "path";
 import { Request, Response } from "express";
-
 import { summaryService } from "../github/services/summaryService";
 import { taskService } from "../github/services/taskService";
 
@@ -13,83 +12,77 @@ const runProjectMap = new Map<string, number>();
 const analysisStatus = new Map<string, string>();
 
 
-//POST /analysis/run
+// POST /analysis/run : AI 분석 시작
 export const startFullAnalysis = async (req: Request, res: Response) => {
-  console.log("=== [START ANALYSIS] ===");
-  console.log("Request body:", req.body);
+  console.log("START ANALYSIS");
 
   try {
     const { repo, projectId } = req.body;
-
-    if (!repo || !repo.repo_id) {
-      console.error("[ERROR] Missing repo.repo_id");
-      return res.status(400).json({ error: "repo.repo_id is required" });
-    }
-    if (!projectId) {
-      console.error("[ERROR] Missing projectId");
-      return res.status(400).json({ error: "projectId is required" });
-    }
+    if (!repo?.repo_id) return res.status(400).json({ error: "repo.repo_id is required" });
+    if (!projectId) return res.status(400).json({ error: "projectId is required" });
 
     const repoId = BigInt(repo.repo_id);
-    console.log(`→ repoId: ${repoId}, projectId: ${projectId}`);
-
-    console.log(`→ Sending request to AI agent: ${AI_AGENT_URL}/analyze`);
+    console.log("repoId:", repoId, "projectId:", projectId);
 
     const analyzeRes = await axios.post(`${AI_AGENT_URL}/analyze`, { repo });
-
     const runId = analyzeRes.data.run_id;
-    console.log(`→ AI returned runId: ${runId}`);
+    console.log("runId:", runId);
 
     runRepoMap.set(runId, repoId);
     runProjectMap.set(runId, projectId);
     analysisStatus.set(runId, "processing");
 
-    console.log("=== [START ANALYSIS COMPLETE] ===");
-
     return res.json({ runId });
 
   } catch (err: any) {
-    console.error("[ERROR startFullAnalysis]");
-    console.error("Message:", err.message);
-    console.error("Stack:", err.stack);
+    console.error("ERROR startFullAnalysis:", err.message);
     return res.status(500).json({ error: "Failed to start analysis" });
   }
 };
 
 
 
-//GET /analysis/status/:runId
+// GET /analysis/status/:runId : 모든 json이 생성되었는지 확인
 export const getAnalysisStatus = async (req: Request, res: Response) => {
-  console.log("=== [CHECK STATUS] ===");
+  console.log("CHECK STATUS");
 
   try {
     const { runId } = req.params;
-
+    //results 파일 경로: backend/results
     const baseDir = path.join(__dirname, "../../results", runId);
-    console.log(`→ Checking directory: ${baseDir}`);
 
-    if (fs.existsSync(baseDir)) {
-      console.log("→ Status: completed");
-      analysisStatus.set(runId, "completed");
+    //structural.json: 그래프 정보 , summarization.json: 요약 정보 , task_output.json: task 정보
+    const structural = path.join(baseDir, "structural.json");
+    const summary = path.join(baseDir, "summarization.json");
+    const tasks = path.join(baseDir, "task_output.json");
+
+    const hasStructural = fs.existsSync(structural);
+    const hasSummary = fs.existsSync(summary);
+    const hasTasks = fs.existsSync(tasks);
+
+    //세 파일이 모두 생성되어야 완료되었다고 판단한다.
+    if (hasStructural && hasSummary && hasTasks) {
+      console.log("STATUS completed");
       return res.json({ status: "completed" });
     }
 
-    console.log("→ Status: processing");
-    return res.json({ status: "processing" });
+    console.log("STATUS processing");
+    return res.json({
+      status: "processing",
+      structural: hasStructural,
+      summarization: hasSummary,
+      task_recommendation: hasTasks
+    });
 
-  } catch (err: any) {
-    console.error("[ERROR getAnalysisStatus]");
-    console.error("Message:", err.message);
-    console.error("Stack:", err.stack);
+  } catch (err) {
+    console.error("ERROR getAnalysisStatus:", err);
     return res.status(500).json({ error: "Failed to check status" });
   }
 };
 
-
-
-//GET /analysis/result/:runId -> structural.json(graph), summary & task (db 파싱된 버전) 조회
+// GET /analysis/result/:runId : 결과 조회
 export const getAnalysisResult = async (req: Request, res: Response) => {
-  console.log("=== [LOAD ANALYSIS RESULT] ===");
+  console.log("LOAD RESULT");
 
   try {
     const { runId } = req.params;
@@ -97,83 +90,37 @@ export const getAnalysisResult = async (req: Request, res: Response) => {
     const repoId = runRepoMap.get(runId);
     const projectId = runProjectMap.get(runId);
 
-    console.log(`→ runId: ${runId}`);
-    console.log(`→ repoId: ${repoId}, projectId: ${projectId}`);
-
-    if (!repoId || !projectId) {
-      console.error("Invalid runId mapping — repoId or projectId missing");
-      return res.status(400).json({ error: "Invalid runId mapping" });
-    }
+    if (!repoId || !projectId) return res.status(400).json({ error: "Invalid runId mapping" });
 
     const baseDir = path.join(__dirname, "../../results", runId);
-    console.log(`→ Looking for result folder: ${baseDir}`);
-
-    if (!fs.existsSync(baseDir)) {
-      console.error("Result folder not found");
-      return res.status(404).json({ error: "Result not ready" });
-    }
-
-
-
-    //structural.json
-    console.log("→ Reading structural.json...");
     const structuralPath = path.join(baseDir, "structural.json");
-    let structural = null;
+    const summaryPath = path.join(baseDir, "summarization.json");
+    const tasksPath = path.join(baseDir, "task_output.json");
 
-    if (fs.existsSync(structuralPath)) {
-      try {
-        structural = JSON.parse(fs.readFileSync(structuralPath, "utf-8"));
-        console.log("structural.json loaded");
-      } catch (err) {
-        console.error("Failed parsing structural.json");
-        console.error(err);
-      }
-    } else {
-      console.warn("structural.json NOT found");
+    const ready = fs.existsSync(structuralPath) && fs.existsSync(summaryPath) && fs.existsSync(tasksPath);
+    if (!ready) {
+      console.log("RESULT not ready");
+      return res.json({ status: "processing" });
     }
 
+    const structural = JSON.parse(fs.readFileSync(structuralPath, "utf-8"));
 
-
-    //Save summary from summarization.json
-    console.log("→ Saving summary into DB...");
-    try {
-      await summaryService.saveSummaryFromResult(runId, repoId);
-      console.log("Summary saved");
-    } catch (err) {
-      console.error("ERROR saving summary");
-      console.error(err);
-    }
+    await summaryService.saveSummaryFromResult(runId, repoId);
+    await taskService.saveTasksFromResult(runId, repoId, projectId);
 
     const summary = await summaryService.getSummaryByRunId(runId);
-
-
-
-    //Save tasks from task_output.json
-    console.log("→ Saving tasks into DB...");
-    try {
-      await taskService.saveTasksFromResult(runId, repoId, projectId);
-      console.log("Tasks saved");
-    } catch (err) {
-      console.error("ERROR saving tasks");
-      console.error(err);
-    }
-
     const tasks = await taskService.getTasksByRunId(runId);
-
-
-    console.log("=== [RESULT READY → RETURNING JSON] ===");
 
     return res.json({
       runId,
-      structural,
-      summary,
-      tasks
+      status: "completed",
+      structural, //json 그대로 반환
+      summary, //db 저장 후 반환
+      tasks //db 저장 후 반환
     });
 
   } catch (err: any) {
-    console.error("[ERROR getAnalysisResult]");
-    console.error("Message:", err.message);
-    console.error("Stack:", err.stack);
-    return res.status(500).json({ error: "Failed to load analysis result" });
+    console.error("ERROR getAnalysisResult:", err.message);
+    return res.status(500).json({ error: "Failed to load result" });
   }
 };

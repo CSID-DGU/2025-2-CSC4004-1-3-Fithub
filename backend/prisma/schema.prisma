@@ -7,6 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//유저(github 0auth 연동 로그인)
 model User {
   id             Int              @id @default(autoincrement())
   githubId       String           @unique
@@ -22,6 +23,7 @@ model User {
   tasks             Task[]
 }
 
+//GIthub Repository
 model repository {
   repo_id        BigInt    @id
   name           String?   @db.VarChar(255)
@@ -46,6 +48,7 @@ model repository {
   tasks               Task[]
 }
 
+//Commit 정보
 model commit {
   commit_sha   String    @id @db.VarChar(255)
   repo_id      BigInt?
@@ -58,6 +61,7 @@ model commit {
   repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
 }
 
+//file 정보
 model file {
   file_id String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   repo_id BigInt?
@@ -70,6 +74,7 @@ model file {
   repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
 }
 
+//issue 정보
 model issue {
   issue_id     BigInt      @id
   repo_id      BigInt?
@@ -84,6 +89,7 @@ model issue {
   repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
 }
 
+//pr 정보
 model pull {
   pull_id    BigInt       @id
   repo_id    BigInt?
@@ -95,6 +101,7 @@ model pull {
   repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
 }
 
+//프로젝트
 model Project {
   id          Int      @id @default(autoincrement())
   name        String
@@ -108,6 +115,17 @@ model Project {
   createdAt DateTime @default(now())
 }
 
+//프로젝트 내에 생성(연결)하는 github repository
+model ProjectRepository {
+  id        Int    @id @default(autoincrement())
+  projectId Int
+  repo_id   BigInt
+
+  project Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repo    repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+}
+
+//프로젝트 내의 멤버
 model ProjectMember {
   id        Int      @id @default(autoincrement())
   projectId Int
@@ -118,6 +136,7 @@ model ProjectMember {
   user    User    @relation("UserProjectMembers", fields: [userId], references: [id], onDelete: Cascade)
 }
 
+//Role enum table
 enum Role {
   FRONTEND
   BACKEND
@@ -127,20 +146,16 @@ enum Role {
   COMMON
 }
 
+//task status enum table
 enum TaskStatus {
   UNDONE
   IN_PROGRESS
   DONE
 }
 
-model ProjectRepository {
-  id        Int    @id @default(autoincrement())
-  projectId Int
-  repo_id   BigInt
-
-  project Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  repo    repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
-}
+/*
+  Task, Summary - AI 서버가 결과값으로 도출한 json 파일을 파싱하여 db에 저장
+*/
 
 model Task {
   id             Int        @id @default(autoincrement())

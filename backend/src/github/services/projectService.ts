@@ -93,17 +93,17 @@ export const deleteProject = async (projectId: number) => {
 
   if (!project) return null;
 
-  // 👉 1) projectRepository 먼저 삭제
+  //projectRepository 삭제
   await prisma.projectRepository.deleteMany({
     where: { projectId },
   });
 
-  // 👉 2) projectMember 삭제 (이게 없으면 FK 에러 터짐)
+  //projectMember 삭제
   await prisma.projectMember.deleteMany({
     where: { projectId },
   });
 
-  // 👉 3) 프로젝트 삭제
+  //프로젝트 삭제
   await prisma.project.delete({
     where: { id: projectId },
   });

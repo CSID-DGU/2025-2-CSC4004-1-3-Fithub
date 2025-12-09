@@ -14,13 +14,11 @@ import userRoutes from "./routes/userRoutes";
 import authRoutes from "./routes/authRoutes";
 import YAML from "yamljs";
 
-
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
 
 const app = express();
-
 app.use(cors({
   origin: "*",   
   credentials: true
@@ -29,16 +27,6 @@ app.use(cors({
 app.use(helmet());
 app.use(express.json());
 
-//github oauth code를 받기 위한 리다이렉트용 dummy url -> 프론트 연동 후 삭제 예정
-app.get("/auth/github/dummy", (req, res) => {
-  const code = req.query.code;
-  res.send(`Your GitHub code is: ${code}`);
-});
-
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
-});
-
 app.use("/auth", authRoutes);                 
 app.use("/projects", projectRoutes);  
 app.use("/users",userRoutes);      
@@ -46,15 +34,14 @@ app.use("/analysis", analysisRoutes);
 app.use("/summary",summaryRoutes);
 app.use("/task",taskRoutes);
 app.use("/github", githubRoutes);
-
 app.use(errorHandler);
 
-app.get("/", (_req, res) => {
-  res.send("Backend server is running.");
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
 });
 
-
 const PORT = process.env.PORT || 4000;
+
 app.listen(PORT, () => {
   console.log(`Node.js Backend server is running on port ${PORT}`);
 });

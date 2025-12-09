@@ -1,5 +1,3 @@
-// src/github/services/authService.ts
-
 import axios from "axios";
 import prisma from "../../prisma";
 import jwt from "jsonwebtoken";

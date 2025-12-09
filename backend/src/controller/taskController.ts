@@ -1,8 +1,7 @@
-// src/controller/taskController.ts
-
 import { Request, Response } from "express";
 import { taskService } from "../github/services/taskService";
 
+//task 조회
 export const getTasksByRunId = async (req: Request, res: Response) => {
   try {
     const { runId } = req.params;

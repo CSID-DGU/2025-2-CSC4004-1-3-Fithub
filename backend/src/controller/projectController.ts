@@ -103,7 +103,7 @@ export const addRepoToProject = async (req: Request, res: Response) => {
   }
 };
 
-//프로젝트 리스트 조회:callback 오류 자꾸 떠서 routes에서 직접 callback함.
+//프로젝트 리스트 조회:callback 오류가 반복적으로 발생하여 routes에서 직접 callback
 
 //프로젝트 삭제
 export const deleteProject = async (req: Request, res: Response) => {

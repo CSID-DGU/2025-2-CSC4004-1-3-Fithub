@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//유저(github 0auth 연동 로그인)
+model User {
+  id             Int              @id @default(autoincrement())
+  githubId       String           @unique
+  login          String
+  avatarUrl      String?
+  name           String?
+  email          String?
+  createdAt      DateTime         @default(now())
+
+  githubAccessToken String?
+  ownedProjects     Project[]        @relation("UserOwnedProjects")
+  projectMembers    ProjectMember[]  @relation("UserProjectMembers")
+  tasks             Task[]
+}
+
+//GIthub Repository
+model repository {
+  repo_id        BigInt    @id
+  name           String?   @db.VarChar(255)
+  full_name      String?   @db.VarChar(255)
+  private        Boolean?
+  html_url       String?
+  description    String?
+  default_branch String?   @db.VarChar(255)
+  language       String?   @db.VarChar(255)
+  created_at     DateTime? @db.Timestamp(6)
+  updated_at     DateTime? @db.Timestamp(6)
+  pushed_at      DateTime? @db.Timestamp(6)
+  owner_login    String?   @db.VarChar(255)
+
+  commits commit[]
+  files   file[]
+  issues  issue[]
+  pulls   pull[]
+
+  projectRepositories ProjectRepository[]
+  summaries   Summary[]
+  tasks               Task[]
+}
+
+//Commit 정보
+model commit {
+  commit_sha   String    @id @db.VarChar(255)
+  repo_id      BigInt?
+  author_name  String?   @db.VarChar(255)
+  author_email String?   @db.VarChar(255)   
+  date         DateTime? @db.Timestamp(6)
+  message      String?
+  parent_sha   String?   @db.VarChar(255)
+
+  repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+}
+
+//file 정보
+model file {
+  file_id String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  repo_id BigInt?
+  path    String
+  sha     String? @db.VarChar(255)
+  size    Int?
+  type    String? @db.VarChar(50)
+  content String? @db.Text
+
+  repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+}
+
+//issue 정보
+model issue {
+  issue_id     BigInt      @id
+  repo_id      BigInt?
+  issue_number Int?
+  issue_url    String?
+  author       Json?
+  title        String?
+  state        String?      @db.VarChar(50)
+  created_at   DateTime?    @db.Timestamp(6)
+  closed_at    DateTime?    @db.Timestamp(6)
+
+  repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+}
+
+//pr 정보
+model pull {
+  pull_id    BigInt       @id
+  repo_id    BigInt?
+  title      String?
+  state      String?   @db.VarChar(50)
+  created_at DateTime? @db.Timestamp(6)
+  closed_at  DateTime? @db.Timestamp(6)
+
+  repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+}
+
+//프로젝트
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  ownerId     Int 
+
+  owner   User    @relation("UserOwnedProjects", fields: [ownerId], references: [id], onDelete: Cascade)
+  members ProjectMember[]
+  repos   ProjectRepository[]
+  tasks     Task[]
+  createdAt DateTime @default(now())
+}
+
+//프로젝트 내에 생성(연결)하는 github repository
+model ProjectRepository {
+  id        Int    @id @default(autoincrement())
+  projectId Int
+  repo_id   BigInt
+
+  project Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repo    repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
+}
+
+//프로젝트 내의 멤버
+model ProjectMember {
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  userId    Int
+  role      Role?
+
+  project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation("UserProjectMembers", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+//Role enum table
+enum Role {
+  FRONTEND
+  BACKEND
+  AI
+  DEVOPS
+  DATABASE
+  COMMON
+}
+
+//task status enum table
+enum TaskStatus {
+  UNDONE
+  IN_PROGRESS
+  DONE
+}
+
+/*
+  Task, Summary - AI 서버가 결과값으로 도출한 json 파일을 파싱하여 db에 저장
+*/
+
+model Task {
+  id             Int        @id @default(autoincrement())
+  projectId      Int
+  repo_id        BigInt?
+
+  title          String
+  description    String?
+  status         TaskStatus @default(UNDONE)
+
+  role           Role?
+  assigneeUserId Int?
+  assignee       User?      @relation(fields: [assigneeUserId], references: [id])
+
+  source         String     @default("AI")
+  runId          String?
+
+  target         String?
+  priority       String?
+  taskType       String?
+  category       String?
+  confidence     Int?
+
+  project        Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repository     repository? @relation(fields: [repo_id], references: [repo_id], onDelete: SetNull)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+model Summary {
+  id        Int        @id @default(autoincrement())
+  runId     String    @unique
+  repoId    BigInt
+  repository repository @relation(fields: [repoId], references: [repo_id])
+
+  items     SummaryItem[]
+  createdAt DateTime @default(now())
+}
+
+
+model SummaryItem {
+  id              Int        @id @default(autoincrement())
+  summaryId       Int
+
+  codeId          String?
+  text            String?
+  unifiedSummary  String?
+  level           String?
+  qualityScore    Float?
+
+  logic           String?
+  intent          String?
+  structure       String?
+
+  summary Summary @relation(fields: [summaryId], references: [id], onDelete: Cascade)
+}

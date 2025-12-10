@@ -115,7 +115,11 @@ async def summarize_node(state: AgentState) -> Dict[str, Any]:
     start_time = time.time()
     try:
         summ = create_summarizer(device="cpu")
-        res = summ.summarize_repository(state["repo_path"])
+        
+        # [Selective Retry Logic]
+        target_ids = state.get("target_files") # Orchestrator가 지정한 재분석 리스트
+        
+        res = summ.summarize_repository(state["repo_path"], target_ids=target_ids)
 
         summaries = res.get("file_summaries", [])
         save_mcp_result(state.get("run_id", "default"), "summarization", summaries)
@@ -197,44 +201,61 @@ async def fusion_node(state: AgentState) -> Dict[str, Any]:
         return {"error_message": str(e)}
 
 async def evaluate_node(state: AgentState) -> Dict[str, Any]:
-    """[Quality Gate] 벡터 일관성 평가"""
+    """[Quality Gate] Orchestrator를 통한 진행 판단"""
+    from .orchestrator import create_orchestrator
+    
     start_time = time.time()
     try:
         fused_data = state.get("fused_data_package", {})
         nodes = fused_data.get("nodes", [])
 
-        # 임베딩 유틸 재사용
+        # 1. 평가를 위한 기본 점수 계산 (Cosine Sim) - 기존 로직 유지
+        # (Orchestrator 내부에서 할 수도 있지만, 여기서 계산해서 넘겨주는 구조가 데이터 흐름상 깔끔함)
         from mcp.semantic_embedding.embedder import create_embedder
-        embedder = create_embedder(device="cpu")
+        try:
+            embedder = create_embedder(device="cpu")
+            total_sim = 0
+            count = 0
+            for node in nodes:
+                summary = node.get("summary_text", "")
+                code_vec = node.get("embedding", [])
+                
+                if summary and code_vec and len(summary) > 5:
+                    sum_vec = embedder._generate_embedding(summary, "graphcodebert")
+                    sim = cosine_similarity([code_vec], [sum_vec])[0][0]
+                    node['quality_score'] = float(sim)
+                    total_sim += sim
+                    count += 1
+                else:
+                    node['quality_score'] = 0.5
+        except Exception as e:
+            logger.warning(f"Score calculation failed (skipping): {e}")
 
-        total_sim = 0
-        count = 0
-
-        for node in nodes:
-            summary = node.get("summary_text", "")
-            code_vec = node.get("embedding", [])
-
-            # 요약문과 코드가 모두 있는 경우만 평가
-            if summary and code_vec and len(summary) > 5:
-                # 요약문 벡터화
-                sum_vec = embedder._generate_embedding(summary, "graphcodebert")
-                # 코사인 유사도 계산
-                sim = cosine_similarity([code_vec], [sum_vec])[0][0]
-
-                node['quality_score'] = float(sim)
-                total_sim += sim
-                count += 1
-            else:
-                node['quality_score'] = 0.5 # 기본값
-
-        avg_score = total_sim / count if count > 0 else 0.6 # 기본값 0.6
+        # 2. Orchestrator에게 판단 위임
+        orchestrator = create_orchestrator()
+        evaluation = orchestrator.evaluate_progress(state) # State의 노드 정보를 보고 판단
+        
+        logger.info(f"👮‍♂️ Orchestrator Decision: {evaluation['decision']} (Mode: {evaluation['retry_mode']})")
+        if evaluation['retry_mode'] == 'partial':
+            logger.info(f"   -> Targeting {len(evaluation['target_files'])} files for retry.")
 
         log_node_execution(state, "evaluate", "success", time.time() - start_time)
-        return {"metrics": {"consistency_score": avg_score}, "fused_data_package": fused_data}
+        
+        return {
+            "metrics": state.get("metrics", {}), # Score는 Orchestrator 내부에서 state 업데이트함
+            "decision": evaluation["decision"],
+            "retry_mode": evaluation["retry_mode"],
+            "target_files": evaluation.get("target_files", []), # Safe access
+            "fused_data_package": fused_data # 점수가 업데이트된 노드 정보 반환
+        }
 
     except Exception as e:
         logger.error(f"Evaluate error: {e}")
-        return {"metrics": {"consistency_score": 0.0}}
+        return {
+            "decision": "refine", # 에러나면 안전하게 재시도
+            "retry_mode": "full",
+            "metrics": {"consistency_score": 0.0}
+        }
 
 async def refine_node(state: AgentState) -> Dict[str, Any]:
     """[Refine] 재시도 횟수 증가"""

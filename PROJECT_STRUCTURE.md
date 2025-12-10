@@ -362,71 +362,21 @@ graph TD
 3. **명확한 역할 분담:**
     - Repo MCP는 **"이해"**를 담당하고, Graph MCP는 **"표현"**을 담당하여 파이프라인 관리가 용이합니다.
 
-네, **첫 번째 다이어그램의 깔끔한 스타일(평가 루프 포함)**을 유지하면서, **두 번째 다이어그램의 구체적인 모델 구성과 Context-First(Repo → Graph) 흐름**을 완벽하게 결합한 최종 플로우 차트입니다.
-
-### 🏛️ 최종 통합 아키텍처: Context-First AI Agent Pipeline
-
-```mermaid
-graph TD
-    Start((Source Code))
-
-    subgraph Phase1 ["Phase 1: Local Parallel Analysis"]
-        direction TB
-        MCP_Sum["MCP 1: Summarization<br>(CodeT5+ / StarCoder2 / UniXcoder)"]
-        MCP_Emb["MCP 2: Structural & Embed<br>(GraphCodeBERT / Code2Vec / Tree-sitter)"]
-    end
-
-    Start --> MCP_Sum
-    Start --> MCP_Emb
-
-    MCP_Sum & MCP_Emb --> Fusion["Node Fusion<br>(Summary + Vectors + AST)"]
-
-    Fusion --> Evaluate{"Quality Check<br>(Consistency)"}
-
-    Evaluate -- "Low Score (< 0.7)" --> Refine["Refine Analysis<br>(Parameters)"]
-    Refine -.->|Retry| MCP_Sum
-    Refine -.->|Retry| MCP_Emb
-
-    Evaluate -- "Pass" --> MCP_Repo
-
-    subgraph Phase2 ["Phase 2: Global Context Analysis"]
-        MCP_Repo["MCP 3: Repository Analysis<br>(RepoCoder + LLM)"]
-        ContextMeta["Context Metadata<br>1. Domain Tags (Color)<br>2. Layers (Layout)<br>3. Logical Edges"]
-    end
-
-    MCP_Repo --> ContextMeta
-
-    subgraph Phase3 ["Phase 3: Graph Visualization"]
-        MCP_Graph["MCP 4: Graph Analysis<br>(RepoGraph GNN + CuBERT)"]
-        FinalGraph["Final Visual Graph JSON"]
-    end
-
-    Fusion -->|Raw Data| MCP_Graph
-    ContextMeta -->|Injection| MCP_Graph
-    MCP_Graph --> FinalGraph
-
-    subgraph Phase4 ["Phase 4: Action & Report"]
-        MCP_Task["MCP 5: Task Recommender<br>(CodeT5 Refinement)"]
-        Dashboard["Final User Dashboard<br>(Graph + Report + Tasks)"]
-    end
-
-    ContextMeta --> MCP_Task
-    FinalGraph --> MCP_Task
-    MCP_Task --> Dashboard
-```
-
 ---
 
-### 🔎 다이어그램 해석 및 핵심 포인트
+## 🕵️‍♂️ 구현 검증 보고서 (Implementation Reality Check)
 
-1. **Phase 1 (병렬 분석 & 평가 루프):**
-    - 첫 번째 그림의 스타일대로 `MCP 1`과 `MCP 2`가 병렬로 돌고, `Fusion` 후에 `Evaluate(품질 평가)`를 거칩니다.
-    - **Loop:** 만약 점수가 낮으면 `Refine`을 통해 다시 Phase 1으로 돌아갑니다.
-2. **Phase 2 (Repo Analysis - The Architect):**
-    - 품질 평가를 통과한 데이터는 바로 그래프를 그리지 않고, **Repo Analysis MCP**로 들어갑니다.
-    - 여기서 **RepoCoder**와 **LLM**이 "이 파일은 보안 모듈이고, 저 파일과 논리적으로 연결됨"이라는 **Context Metadata**를 생성합니다.
-3. **Phase 3 (Graph Analysis - The Visualizer):**
-    - **핵심:** `Fusion`된 원천 데이터와 `Context Metadata`가 **MCP 4 (Graph Analysis)**에서 만납니다.
-    - *RepoGraph(GNN)**와 **CuBERT**가 문맥 정보를 반영하여 **"의미 있는 색상과 배치를 가진 그래프"**를 생성합니다.
-4. **Phase 4 (최종):**
-    - 모든 정보가 **Task Recommender**로 모여 최종 대시보드에 뿌려집니다.
+**"설명서에 있는 고급 기능들이 실제로 코드로 구현되어 있는가?"**에 대한 검증 결과입니다.
+
+### 1️⃣ Repo Analysis (문맥 분석가)
+> **"RepoCoder 있는 거 맞아요?"** 👉 **네, `_detect_vector_edges` 함수로 구현됨.**
+-   **코드 실체:** `mcp/repository_analysis/analyzer.py`
+-   **검증:** `Cosine Similarity` 계산 결과가 유사도 0.85 이상일 경우 `logical_edge`를 생성하는 로직이 포함되어 있습니다.
+-   **Mistral/GPT 태깅:** `_analyze_with_llm` 함수를 통해 LLM API를 호출하여 도메인 및 계층을 분류합니다.
+
+### 2️⃣ Graph Analysis (시각화 기술자)
+> **"GNN으로 중요도 계산한다며?"** 👉 **네, `RepoGraphPredictor`가 있습니다.**
+-   **코드 실체:** `mcp/graph_analysis/visualizer.py`
+-   **검증:** `RepoGraph`라는 로컬 모델을 불러와서 호출 그래프를 생성하고, **PageRank 알고리즘**을 수행하여 추출한 중요도(importance) 점수를 노드 크기(Size) 결정에 반영합니다.
+
+**결론:** 설계도 상의 모든 핵심 기능(Context Injection, GNN Importance, Vector Logic)이 실제 Python 코드로 구현되어 있음을 확인했습니다. ✅

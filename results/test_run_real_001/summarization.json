@@ -1,0 +1,74 @@
+[
+  {
+    "code_id": "config.py",
+    "text": "= os.getenv(\"OPENAI_API_URL\", \"http://openai\")\n\n   # --- Internal Services ---\n   # --- External Services ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "__init__.py",
+    "text": ": \"\"\"Agent Service for CodeAnalysis.\"\"\"",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "edges.py",
+    "text": "check_quality(state: AgentState)\n   ",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "schemas.py",
+    "text": "== Field(..., description=\"Description\")\n\nclass====================== Field(None,==",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "utils.py",
+    "text": "Thethe data to save.\n  :The data to(e.g., 'summarization','structural', 'structural').\n  Thethethethethethethethethethethethethethethethethe data.thethethethe data of the",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "orchestrator.py",
+    "text": "(Retry All)\n        self.MIN_STATUS_SCORE= 0.6# If avg < 0.5,# If node <0.6, AgentAssume Systemic Failure (Retry# If0.7, AgentAssume Spec (Retry# If0.8, Agent assumes Specself.MAX_RETRIES_SCORE = 0.7# If0.9, Agent#",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "fusion.py",
+    "text": "빠른 검색을 위한 하나로 '강화된 데이터'를 생성합니다.\n# 2. 형태 서핑 매",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "workflow.py",
+    "text": "# [New] 그래프 시각화 생성 (Visual)\nfr[New]문맥 분석 이터 수집 진입점 에 무섰,,,,",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "router.py",
+    "text": "self.provider = Config.LLM_PROVIDER\n       self.client = InferenceClient\n       = None\n\nclass WorkflowRouter:\n   = None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "nodes.py",
+    "text": "==========================",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "main.py",
+    "text": "..........................",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "state.py",
+    "text": "# --- Phase 3:```\n   ``````````````````````````````````````````````````````````````````````````````` ``````",
+    "level": "file",
+    "model": "codet5-small-local"
+  }
+]

@@ -29,12 +29,15 @@ class Config:
     TIMEOUT = 60.0
     MAX_ANALYSIS_FILES = 50 # Reduced for testing (was 10000)
 
+    # --- Local Mode Settings ---
+    USE_LOCAL_LLM = True # Use Local Mistral/Chat for Analysis (Rule-based Fallback effectively)
+    USE_LOCAL_SUMMARIZER = True # Use Local CodeT5 for Summarization
+
     # --- 🤖 Model Configurations (Verified for Free Tier) ---
 
-    # 1. [요약] Qwen/Qwen2.5-Coder-1.5B-Instruct
-    # 이유: 최신 소형 언어 모델로서 HF Inference API (무료) 지원이 원활하며 Chat API 호환됨.
-    # CodeT5는 text_generation API 호환성 문제(StopIteration)로 교체됨.
-    MODEL_SUMMARIZER = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+    # 1. [요약] Salesforce/codet5-base
+    # 이유: User preferred CodeT5. API compatibility issues are resolved by using proper endpoint or local fallback.
+    MODEL_SUMMARIZER = "Salesforce/codet5-base"
 
     # 2. [임베딩] microsoft/graphcodebert-base
     # 이유: 코드 임베딩의 표준. Feature Extraction API 지원이 확실함.
@@ -44,8 +47,12 @@ class Config:
     MODEL_LLM = "mistralai/Mistral-7B-Instruct-v0.3"
     MODEL_LLM_OPENAI = "gpt-4o" # OpenAI 사용 시 기본 모델
 
-    # --- 🤖 Ensemble Summarization Models ---
-    # Qwen으로 통일 (Role Prompting으로 관점 분리)
-    MODEL_SUMMARIZER_LOGIC = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
-    MODEL_SUMMARIZER_INTENT = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
-    MODEL_SUMMARIZER_STRUCTURE = "Qwen/Qwen2.5-Coder-1.5B-Instruct"
+    # --- 🤖 Ensemble Summarization Models (Robust Role-Based Strategy) ---
+    # Unified Model: Qwen/Qwen2.5-Coder-32B-Instruct (SOTA Open Source Code Model)
+    # We use ONE powerful model with 3 different "System Prompts" (Personas).
+    MODEL_SUMMARIZER_LOGIC = "Qwen/Qwen2.5-Coder-32B-Instruct"
+    MODEL_SUMMARIZER_INTENT = "Qwen/Qwen2.5-Coder-32B-Instruct"
+    MODEL_SUMMARIZER_STRUCTURE = "Qwen/Qwen2.5-Coder-32B-Instruct"
+    
+    # Flag to enable the new Prompt-based dispatch logic
+    USE_ROLE_BASED_ENSEMBLE = True

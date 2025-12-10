@@ -1,0 +1,29 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "ROOT",
+        "label": "Fithub",
+        "size": 30,
+        "color": "#000000",
+        "group": "Root",
+        "type": "directory",
+        "parent": null
+      }
+    ],
+    "edges": []
+  },
+  "context": {
+    "file_metadata": {},
+    "logical_edges": []
+  },
+  "recommendations": [],
+  "metrics": {
+    "consistency_score": 0.6,
+    "coverage": {
+      "total_files": 1,
+      "analyzed_files": 0,
+      "percentage": 0.0
+    }
+  }
+}

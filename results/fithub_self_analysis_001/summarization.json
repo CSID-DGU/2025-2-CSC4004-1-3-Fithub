@@ -1,0 +1,182 @@
+[
+  {
+    "code_id": "run_pipeline_cli.py",
+    "text": "run_cli_test:\n    Runs theagent.workflowagent.stateagent.config.)....................",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "analyze_github.py",
+    "text": "{url}\")\nbearing print(f\"⬇️ Cloning{url}...\")\nBeing{dest}\")( \"git\" ) :\"git\" ] )()()()()()( ) :( ) )( )( )( )( )( )( )( )(",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "verify_full_graph.py",
+    "text": "\"id\" :\"id\", \"type\": \"application/json\",\"name\":\"name\" :\"type\" :\"type\":\"type\", \"name\":\"name\", \"level\": \"INFO\", \"message\":\"message\": \"ERROR\", \"description\": \"WARNING\",: \"WARNING\" ,\"description\":: \"ERROR\" ,: \"INFO\" ,: \"DEBUG\" ,\"",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "analyze_fithub_project.py",
+    "text": "= True\nConfig.USE_LOCAL_SUMMARIZER == True= True= True= True= True= True= True= True= True= True= True= True= True= True= True= True= True= True= True= True= True= True= True= True= True",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "regenerate_result.py",
+    "text": "\"repo_path\": repo_path,\n       \"run_id\": run_id,\nAntlr \"repo_input\":,\nSpot\"state\": AgentState,\"state\" : AgentState ,: AgentState }: agent_state ,:,::::::::: agent . state: agent: agent: agent: agent:",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/config.py",
+    "text": "= os.getenv(\"OPENAI_API_URL\", \"http://openai\")\n\n   # --- Internal Services ---\n   # --- External Services ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/__init__.py",
+    "text": ": \"\"\"Agent Service for CodeAnalysis.\"\"\"",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/edges.py",
+    "text": "check_quality(state: AgentState)\n   ",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/schemas.py",
+    "text": "== Field(..., description=\"Description\")\n\nclass====================== Field(None,==",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/utils.py",
+    "text": "Thethe data to save.\n  :The data to(e.g., 'summarization','structural', 'structural').\n  Thethethethethethethethethethethethethethethethethe data.thethethethe data of the",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/orchestrator.py",
+    "text": "(Retry All)\n        self.MIN_STATUS_SCORE= 0.6# If avg < 0.5,# If node <0.6, AgentAssume Systemic Failure (Retry# If0.7, AgentAssume Spec (Retry# If0.8, Agent assumes Specself.MAX_RETRIES_SCORE = 0.7# If0.9, Agent#",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/fusion.py",
+    "text": "빠른 검색을 위한 하나로 '강화된 데이터'를 생성합니다.\n# 2. 형태 서핑 매",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/workflow.py",
+    "text": "# [New] 그래프 시각화 생성 (Visual)\nfr[New]문맥 분석 이터 수집 진입점 에 무섰,,,,",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/router.py",
+    "text": "self.provider = Config.LLM_PROVIDER\n       self.client = InferenceClient\n       = None\n\nclass WorkflowRouter:\n   = None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/nodes.py",
+    "text": "==========================",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/main.py",
+    "text": "..........................",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/state.py",
+    "text": "# --- Phase 3:```\n   ``````````````````````````````````````````````````````````````````````````````` ``````",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/semantic_embedding/models_loader.py",
+    "text": "class EmbeddingModelPool:\n    def __init__(self, device: Optional[str]=None):\n\n\nclass`````````````````` ````````````````````````````````````````````````````````````````````````````",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/semantic_embedding/__init__.py",
+    "text": ": \"\"\"Semantic Embedding MCP Code",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/semantic_embedding/embedder.py",
+    "text": "set_language(self, lang): passdef set_code(self): pass\n       set_code(): pass\nPassphrase def set_text(self:set_text()): passdef:self, code): passself,)def:self,))))()())( self , code):( self))",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/semantic_embedding/main.py",
+    "text": "로깅 임베더\nembedder = create_embedder()\n\n# =============================================",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/summarization/models_loader.py",
+    "text": "self._loaded:\n\n\nclass SummarizModelPool:\n    \"\"\"요약용 모델들을 초기화합니다.\"\"\"\n\nbearerself.pool = ModelPool(\"summarization\", device=device):\n\nbanerlogger.info(\"Initializing Summarization MCP.\")\nban",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/summarization/__init__.py",
+    "text": ": \"\"\"Summarization MCP Code summarizationService.\"\"\"",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/summarization/summarizer.py",
+    "text": "is missing via Config.HF_API_KEY.\")token =token= token.split(\",\")[0]token.split(',')[1] logger.warning(\"token is missingtoken.endswith(\".\") logger.info(\"token.startswith(\"\")) logger.error(\"Token is missingis missingis missingis missingis missingis missingis missingis missingis missing",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/summarization/main.py",
+    "text": "로깅 설정 생성\napp =. get_logger ( __name__ )=.......................",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/structural_analysis/models_loader.py",
+    "text": "= torch.model.ModelPool(device, cache_dir):\n\nclass StructuralAnalysisModelPool:\n   = torch . model .= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/structural_analysis/analyzer.py",
+    "text": "\"name\": \"Python\",\nc\"functio\" ,\nc\"name\" :\"type\": \"TypeScript\" }\"type\" : \"Python\" } }\"text\": {\nc\"text\"\"text\",\"text: \"C++\" }, \"type\":\"type\",, \"typing\":\"typing\" ,\"name\",\"type_type\":",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/structural_analysis/__init__.py",
+    "text": ": \"\"\"Structural Analysis MCP-Code",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/structural_analysis/main.py",
+    "text": "분석기\napp = BaseModel(\n    title=\"Structural\"Code structure analysis service\",\n    description=\"Code,\n    version=\"1.0.0\"\n)\napp= FastAPI(\nId=\"Structural Analysis MCP\",=,\nId = \"Code structure\"\nId\"=,=,,=,,,,",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/repository_analysis/models_loader.py",
+    "text": "self.pool = ModelPool(\"repository_analysis\", device=device):\n\n\nclass RepositoryAnalysisModelPool:\n   self._loaded = True= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False=",
+    "level": "file",
+    "model": "codet5-small-local"
+  }
+]

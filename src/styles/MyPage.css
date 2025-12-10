@@ -1,0 +1,141 @@
+/* 전체 배경 */
+.mypage-wrapper {
+  background-color: #f0f2f5;
+  min-height: calc(100vh - 60px); /* 헤더 제외 높이 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+/* 로그인 안했을 때 */
+.mypage-container-locked {
+  text-align: center;
+  font-size: 18px;
+  color: #666;
+  margin-top: 100px;
+}
+
+/* 메인 카드 컨테이너 */
+.profile-card-container {
+  width: 100%;
+  max-width: 480px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  overflow: hidden; /* 자식 요소가 삐져나가지 않게 */
+  text-align: center;
+  position: relative;
+}
+
+/* 1. 상단 그라데이션 커버 */
+.profile-cover {
+  height: 140px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* 2. 프로필 컨텐츠 영역 */
+.profile-content {
+  padding: 0 30px 40px; /* 위는 0 (아바타가 겹치므로) */
+  position: relative;
+}
+
+/* 3. 아바타 (겹치기 효과) */
+.avatar-wrapper {
+  margin-top: -60px; /* 커버 위로 올리기 */
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.avatar-img {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 5px solid white; /* 흰색 테두리로 분리감 */
+  object-fit: cover;
+  background-color: #eee;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+/* 텍스트 정보 */
+.profile-name {
+  margin: 0;
+  font-size: 24px;
+  color: #333;
+  font-weight: 700;
+}
+
+.profile-id {
+  margin: 4px 0 24px;
+  color: #888;
+  font-size: 14px;
+}
+
+/* 정보 박스 (표 형태) */
+.info-box {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.info-value {
+  color: #333;
+  font-weight: 600;
+}
+
+/* 버튼 그룹 */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-github {
+  display: block;
+  text-decoration: none;
+  background: #24292e; /* GitHub 색상 */
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.btn-github:hover {
+  background: #333;
+}
+
+.btn-logout {
+  width: 100%;
+  background: white;
+  color: #ff4757;
+  border: 1px solid #ff4757;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-logout:hover {
+  background: #fff0f1;
+}

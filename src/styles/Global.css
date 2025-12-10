@@ -1,0 +1,56 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  background: #f9f9f9;
+}
+
+.project-create-container {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 20px;
+}
+
+.project-create-card {
+  background: #ffffff;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.project-create-card h2 {
+  font-size: 28px;
+  margin-bottom: 24px;
+}
+
+.label {
+  font-size: 16px;
+  margin-top: 18px;
+  display: block;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  margin-top: 8px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+.create-btn {
+  margin-top: 28px;
+  width: 100%;
+  padding: 14px;
+  background: #4cb5f5;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.create-btn:hover {
+  background: #36a0e0;
+}

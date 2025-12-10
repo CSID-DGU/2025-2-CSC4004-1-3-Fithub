@@ -1,0 +1,89 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 32px;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 50px;
+}
+
+.nav a,
+.nav-label {
+  text-decoration: none;
+  color: #222;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.nav-item {
+  position: relative;
+  cursor: pointer;
+  margin: 0 12px;
+  color: #333;
+}
+
+.nav-item:hover {
+  color: #55a0ff;
+}
+
+/* 드롭다운 메뉴 */
+.dropdown {
+  position: absolute;
+  top: 28px;
+  left: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  width: 220px;
+  padding: 6px 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+  z-index: 2000;
+}
+
+/* 메뉴 간격 + hover 보정 */
+.dropdown span,
+.dropdown a {
+  padding: 12px 18px;
+  display: block;
+  color: #222 !important;  /* 상위 hover 색상 상속 방지 */
+  line-height: 1.6;
+}
+
+.dropdown a:hover,
+.dropdown span:hover {
+  background: #f4f4f4;
+  color: #55a0ff !important;  /* hover 시만 파랗게 */
+}
+
+/* 버튼 */
+.signout-btn {
+  background: #f8f8f8;
+  border: 1px solid #ccc;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.signout-btn:hover {
+  background: #ededed;
+}

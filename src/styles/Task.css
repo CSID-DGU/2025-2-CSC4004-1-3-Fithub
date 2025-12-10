@@ -1,0 +1,114 @@
+/* src/styles/Task.css */
+
+.task-container {
+  padding: 30px 40px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+/* AI 버튼 */
+.ai-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+
+.ai-btn:hover {
+  transform: translateY(-2px);
+}
+
+/* 상태 보드 (Overview) */
+.status-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.status-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  text-align: center;
+}
+
+.status-card h3 { margin: 0; font-size: 14px; color: #888; }
+.status-card p { margin: 10px 0 0; font-size: 24px; font-weight: bold; }
+
+.status-card.total { border-top: 4px solid #333; }
+.status-card.todo { border-top: 4px solid #f2994a; }
+.status-card.progress { border-top: 4px solid #56ccf2; }
+.status-card.done { border-top: 4px solid #27ae60; }
+
+/* 테이블 스타일 */
+.task-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.task-table th, .task-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.task-table th { background: #f9f9f9; font-weight: 600; }
+
+/* 뱃지 스타일 */
+.badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+}
+.badge.TODO { background: #f2994a; }
+.badge.IN_PROGRESS { background: #56ccf2; }
+.badge.DONE { background: #27ae60; }
+
+/* 내 작업 그리드 (TaskList) */
+.my-task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.task-card-item {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 50px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  color: #666;
+}

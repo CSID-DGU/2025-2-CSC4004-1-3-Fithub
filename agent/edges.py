@@ -8,7 +8,7 @@ from .router import create_router
 
 def check_quality(state: AgentState) -> Literal["pass", "refine"]:
     """
-    Delegates the decision to the LLM-based Orchestrator (Router).
+    Reads the decision already made by the Orchestrator node.
     """
-    router = create_router()
-    return router.route(state)
+    decision = state.get("decision", "pass")
+    return decision # "pass" or "refine"

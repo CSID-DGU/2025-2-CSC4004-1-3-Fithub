@@ -57,7 +57,12 @@ class RepositoryAnalyzer:
 
         # 1. LLM 분석 시도
         result = None
-        if self.client:
+        # 1. LLM 분석 시도
+        result = None
+        # [Local Mode Check]
+        if getattr(Config, 'USE_LOCAL_LLM', False):
+            logger.info("Local LLM Mode: Skipping generic LLM analysis, using rule-based.")
+        elif self.client:
             try:
                 result = self._analyze_with_llm(nodes)
                 if result:

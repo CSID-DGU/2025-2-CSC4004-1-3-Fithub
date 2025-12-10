@@ -23,9 +23,14 @@ class AgentState(TypedDict, total=False):
     context_metadata: Dict      # [New] Repo Analysis 결과 (태그, 레이어)
     final_graph_json: Dict      # [New] Graph Generation 결과 (좌표 포함)
 
+    # --- Orchestrator Control ---
+    metrics: Dict               # 점수 및 통계
+    decision: str               # "pass" or "refine"
+    retry_mode: str             # "none", "partial", "full"
+    target_files: List[str]     # [Selective Retry] 재분석할 파일 ID 목록
+
     # --- Final ---
     final_artifact: Dict        # 최종 클라이언트 응답
-    metrics: Dict
     recommendations: List[Dict]
 
     # --- System ---

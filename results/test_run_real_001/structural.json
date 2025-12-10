@@ -1,0 +1,1016 @@
+{
+  "nodes": [
+    {
+      "id": "config.py",
+      "type": "file",
+      "label": "config.py",
+      "language": "Python"
+    },
+    {
+      "id": "config.py::Config",
+      "type": "class",
+      "label": "Config",
+      "language": "Python",
+      "docstring": ""
+    },
+    {
+      "id": "__init__.py",
+      "type": "file",
+      "label": "__init__.py",
+      "language": "Python"
+    },
+    {
+      "id": "edges.py",
+      "type": "file",
+      "label": "edges.py",
+      "language": "Python"
+    },
+    {
+      "id": "edges.py::check_quality",
+      "type": "function",
+      "label": "check_quality",
+      "language": "Python",
+      "docstring": "Reads the decision already made by the Orchestrator node.",
+      "args": [
+        "state"
+      ]
+    },
+    {
+      "id": "schemas.py",
+      "type": "file",
+      "label": "schemas.py",
+      "language": "Python"
+    },
+    {
+      "id": "schemas.py::RepoInput",
+      "type": "class",
+      "label": "RepoInput",
+      "language": "Python",
+      "docstring": ""
+    },
+    {
+      "id": "schemas.py::Thresholds",
+      "type": "class",
+      "label": "Thresholds",
+      "language": "Python",
+      "docstring": ""
+    },
+    {
+      "id": "schemas.py::AnalyzeRequest",
+      "type": "class",
+      "label": "AnalyzeRequest",
+      "language": "Python",
+      "docstring": ""
+    },
+    {
+      "id": "schemas.py::AnalyzeResponse",
+      "type": "class",
+      "label": "AnalyzeResponse",
+      "language": "Python",
+      "docstring": ""
+    },
+    {
+      "id": "schemas.py::ResultResponse",
+      "type": "class",
+      "label": "ResultResponse",
+      "language": "Python",
+      "docstring": ""
+    },
+    {
+      "id": "utils.py",
+      "type": "file",
+      "label": "utils.py",
+      "language": "Python"
+    },
+    {
+      "id": "utils.py::save_mcp_result",
+      "type": "function",
+      "label": "save_mcp_result",
+      "language": "Python",
+      "docstring": "Save intermediate MCP results to a structured directory.\n\nArgs:\n    run_id: The unique ID of the current analysis run.\n    component: The name of the component (e.g., 'summarization', 'structural').\n    data: The data to save (usually a dict or list).",
+      "args": [
+        "run_id",
+        "component",
+        "data"
+      ]
+    },
+    {
+      "id": "orchestrator.py",
+      "type": "file",
+      "label": "orchestrator.py",
+      "language": "Python"
+    },
+    {
+      "id": "orchestrator.py::create_orchestrator",
+      "type": "function",
+      "label": "create_orchestrator",
+      "language": "Python",
+      "docstring": "",
+      "args": []
+    },
+    {
+      "id": "orchestrator.py::__init__",
+      "type": "function",
+      "label": "__init__",
+      "language": "Python",
+      "docstring": "",
+      "args": [
+        "self"
+      ]
+    },
+    {
+      "id": "orchestrator.py::evaluate_progress",
+      "type": "function",
+      "label": "evaluate_progress",
+      "language": "Python",
+      "docstring": "Agent Progress Evaluation (Hybrid: Rule + LLM).",
+      "args": [
+        "self",
+        "state"
+      ]
+    },
+    {
+      "id": "orchestrator.py::_has_llm",
+      "type": "function",
+      "label": "_has_llm",
+      "language": "Python",
+      "docstring": "",
+      "args": [
+        "self"
+      ]
+    },
+    {
+      "id": "orchestrator.py::_consult_llm_strategy",
+      "type": "function",
+      "label": "_consult_llm_strategy",
+      "language": "Python",
+      "docstring": "",
+      "args": [
+        "self",
+        "score",
+        "count"
+      ]
+    },
+    {
+      "id": "orchestrator.py::_find_missing_analyses",
+      "type": "function",
+      "label": "_find_missing_analyses",
+      "language": "Python",
+      "docstring": "Summary나 Embedding이 비어있는 노드 식별",
+      "args": [
+        "self",
+        "nodes"
+      ]
+    },
+    {
+      "id": "orchestrator.py::_calculate_average_score",
+      "type": "function",
+      "label": "_calculate_average_score",
+      "language": "Python",
+      "docstring": "",
+      "args": [
+        "self",
+        "nodes"
+      ]
+    },
+    {
+      "id": "orchestrator.py::_find_low_quality_nodes",
+      "type": "function",
+      "label": "_find_low_quality_nodes",
+      "language": "Python",
+      "docstring": "임계값 이하인 노드 식별",
+      "args": [
+        "self",
+        "nodes"
+      ]
+    },
+    {
+      "id": "orchestrator.py::Orchestrator",
+      "type": "class",
+      "label": "Orchestrator",
+      "language": "Python",
+      "docstring": ""
+    },
+    {
+      "id": "fusion.py",
+      "type": "file",
+      "label": "fusion.py",
+      "language": "Python"
+    },
+    {
+      "id": "fusion.py::fuse_data",
+      "type": "function",
+      "label": "fuse_data",
+      "language": "Python",
+      "docstring": "3가지 소스를 하나로 합쳐서 '강화된 노드 데이터'를 생성합니다.",
+      "args": [
+        "summaries",
+        "embeddings",
+        "raw_graph"
+      ]
+    },
+    {
+      "id": "workflow.py",
+      "type": "file",
+      "label": "workflow.py",
+      "language": "Python"
+    },
+    {
+      "id": "workflow.py::create_workflow",
+      "type": "function",
+      "label": "create_workflow",
+      "language": "Python",
+      "docstring": "",
+      "args": []
+    },
+    {
+      "id": "workflow.py::get_workflow",
+      "type": "function",
+      "label": "get_workflow",
+      "language": "Python",
+      "docstring": "",
+      "args": []
+    },
+    {
+      "id": "router.py",
+      "type": "file",
+      "label": "router.py",
+      "language": "Python"
+    },
+    {
+      "id": "router.py::create_router",
+      "type": "function",
+      "label": "create_router",
+      "language": "Python",
+      "docstring": "",
+      "args": []
+    },
+    {
+      "id": "router.py::__init__",
+      "type": "function",
+      "label": "__init__",
+      "language": "Python",
+      "docstring": "",
+      "args": [
+        "self"
+      ]
+    },
+    {
+      "id": "router.py::route",
+      "type": "function",
+      "label": "route",
+      "language": "Python",
+      "docstring": "Decides whether to pass to the next phase or refine the current analysis.",
+      "args": [
+        "self",
+        "state"
+      ]
+    },
+    {
+      "id": "router.py::_rule_based_route",
+      "type": "function",
+      "label": "_rule_based_route",
+      "language": "Python",
+      "docstring": "",
+      "args": [
+        "self",
+        "state"
+      ]
+    },
+    {
+      "id": "router.py::_route_with_openai",
+      "type": "function",
+      "label": "_route_with_openai",
+      "language": "Python",
+      "docstring": "",
+      "args": [
+        "self",
+        "context"
+      ]
+    },
+    {
+      "id": "router.py::_route_with_hf",
+      "type": "function",
+      "label": "_route_with_hf",
+      "language": "Python",
+      "docstring": "",
+      "args": [
+        "self",
+        "context"
+      ]
+    },
+    {
+      "id": "router.py::WorkflowRouter",
+      "type": "class",
+      "label": "WorkflowRouter",
+      "language": "Python",
+      "docstring": ""
+    },
+    {
+      "id": "nodes.py",
+      "type": "file",
+      "label": "nodes.py",
+      "language": "Python"
+    },
+    {
+      "id": "nodes.py::_get_mock_files",
+      "type": "function",
+      "label": "_get_mock_files",
+      "language": "Python",
+      "docstring": "테스트용 가상 파일 데이터",
+      "args": []
+    },
+    {
+      "id": "main.py",
+      "type": "file",
+      "label": "main.py",
+      "language": "Python"
+    },
+    {
+      "id": "state.py",
+      "type": "file",
+      "label": "state.py",
+      "language": "Python"
+    },
+    {
+      "id": "state.py::log_node_execution",
+      "type": "function",
+      "label": "log_node_execution",
+      "language": "Python",
+      "docstring": "",
+      "args": [
+        "state",
+        "node_name",
+        "status",
+        "duration"
+      ]
+    },
+    {
+      "id": "state.py::AgentState",
+      "type": "class",
+      "label": "AgentState",
+      "language": "Python",
+      "docstring": ""
+    }
+  ],
+  "edges": [
+    {
+      "source": "config.py",
+      "target": "config.py::Config",
+      "relation": "defines"
+    },
+    {
+      "source": "config.py",
+      "target": "os.py",
+      "relation": "imports"
+    },
+    {
+      "source": "config.py",
+      "target": "load_dotenv.py",
+      "relation": "imports"
+    },
+    {
+      "source": "edges.py",
+      "target": "edges.py::check_quality",
+      "relation": "defines"
+    },
+    {
+      "source": "edges.py",
+      "target": "Literal.py",
+      "relation": "imports"
+    },
+    {
+      "source": "edges.py",
+      "target": "AgentState.py",
+      "relation": "imports"
+    },
+    {
+      "source": "edges.py",
+      "target": "create_router.py",
+      "relation": "imports"
+    },
+    {
+      "source": "schemas.py",
+      "target": "schemas.py::RepoInput",
+      "relation": "defines"
+    },
+    {
+      "source": "schemas.py",
+      "target": "schemas.py::Thresholds",
+      "relation": "defines"
+    },
+    {
+      "source": "schemas.py",
+      "target": "schemas.py::AnalyzeRequest",
+      "relation": "defines"
+    },
+    {
+      "source": "schemas.py",
+      "target": "schemas.py::AnalyzeResponse",
+      "relation": "defines"
+    },
+    {
+      "source": "schemas.py",
+      "target": "schemas.py::ResultResponse",
+      "relation": "defines"
+    },
+    {
+      "source": "schemas.py",
+      "target": "BaseModel.py",
+      "relation": "imports"
+    },
+    {
+      "source": "schemas.py",
+      "target": "Field.py",
+      "relation": "imports"
+    },
+    {
+      "source": "schemas.py",
+      "target": "Dict.py",
+      "relation": "imports"
+    },
+    {
+      "source": "schemas.py",
+      "target": "Any.py",
+      "relation": "imports"
+    },
+    {
+      "source": "schemas.py",
+      "target": "Optional.py",
+      "relation": "imports"
+    },
+    {
+      "source": "schemas.py",
+      "target": "List.py",
+      "relation": "imports"
+    },
+    {
+      "source": "schemas.py",
+      "target": "datetime.py",
+      "relation": "imports"
+    },
+    {
+      "source": "utils.py",
+      "target": "utils.py::save_mcp_result",
+      "relation": "defines"
+    },
+    {
+      "source": "utils.py",
+      "target": "json.py",
+      "relation": "imports"
+    },
+    {
+      "source": "utils.py",
+      "target": "os.py",
+      "relation": "imports"
+    },
+    {
+      "source": "utils.py",
+      "target": "logging.py",
+      "relation": "imports"
+    },
+    {
+      "source": "utils.py",
+      "target": "Path.py",
+      "relation": "imports"
+    },
+    {
+      "source": "utils.py",
+      "target": "Any.py",
+      "relation": "imports"
+    },
+    {
+      "source": "utils.py",
+      "target": "Dict.py",
+      "relation": "imports"
+    },
+    {
+      "source": "utils.py",
+      "target": "Config.py",
+      "relation": "imports"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "orchestrator.py::create_orchestrator",
+      "relation": "defines"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "orchestrator.py::__init__",
+      "relation": "defines"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "orchestrator.py::evaluate_progress",
+      "relation": "defines"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "orchestrator.py::_has_llm",
+      "relation": "defines"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "orchestrator.py::_consult_llm_strategy",
+      "relation": "defines"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "orchestrator.py::_find_missing_analyses",
+      "relation": "defines"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "orchestrator.py::_calculate_average_score",
+      "relation": "defines"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "orchestrator.py::_find_low_quality_nodes",
+      "relation": "defines"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "orchestrator.py::Orchestrator",
+      "relation": "defines"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "logging.py",
+      "relation": "imports"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "Dict.py",
+      "relation": "imports"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "List.py",
+      "relation": "imports"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "Any.py",
+      "relation": "imports"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "Tuple.py",
+      "relation": "imports"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "AgentState.py",
+      "relation": "imports"
+    },
+    {
+      "source": "orchestrator.py",
+      "target": "Config.py",
+      "relation": "imports"
+    },
+    {
+      "source": "fusion.py",
+      "target": "fusion.py::fuse_data",
+      "relation": "defines"
+    },
+    {
+      "source": "fusion.py",
+      "target": "logging.py",
+      "relation": "imports"
+    },
+    {
+      "source": "fusion.py",
+      "target": "List.py",
+      "relation": "imports"
+    },
+    {
+      "source": "fusion.py",
+      "target": "Dict.py",
+      "relation": "imports"
+    },
+    {
+      "source": "fusion.py",
+      "target": "Any.py",
+      "relation": "imports"
+    },
+    {
+      "source": "fusion.py",
+      "target": "create_summarizer.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "workflow.py::create_workflow",
+      "relation": "defines"
+    },
+    {
+      "source": "workflow.py",
+      "target": "workflow.py::get_workflow",
+      "relation": "defines"
+    },
+    {
+      "source": "workflow.py",
+      "target": "logging.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "StateGraph.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "END.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "AgentState.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "fetch_from_backend_node.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "summarize_node.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "build_graph_node.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "embed_code_node.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "fusion_node.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "evaluate_node.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "refine_node.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "analyze_repo_node.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "generate_graph_node.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "synthesize_node.py",
+      "relation": "imports"
+    },
+    {
+      "source": "workflow.py",
+      "target": "check_quality.py",
+      "relation": "imports"
+    },
+    {
+      "source": "router.py",
+      "target": "router.py::create_router",
+      "relation": "defines"
+    },
+    {
+      "source": "router.py",
+      "target": "router.py::__init__",
+      "relation": "defines"
+    },
+    {
+      "source": "router.py",
+      "target": "router.py::route",
+      "relation": "defines"
+    },
+    {
+      "source": "router.py",
+      "target": "router.py::_rule_based_route",
+      "relation": "defines"
+    },
+    {
+      "source": "router.py",
+      "target": "router.py::_route_with_openai",
+      "relation": "defines"
+    },
+    {
+      "source": "router.py",
+      "target": "router.py::_route_with_hf",
+      "relation": "defines"
+    },
+    {
+      "source": "router.py",
+      "target": "router.py::WorkflowRouter",
+      "relation": "defines"
+    },
+    {
+      "source": "router.py",
+      "target": "logging.py",
+      "relation": "imports"
+    },
+    {
+      "source": "router.py",
+      "target": "json.py",
+      "relation": "imports"
+    },
+    {
+      "source": "router.py",
+      "target": "Literal.py",
+      "relation": "imports"
+    },
+    {
+      "source": "router.py",
+      "target": "Dict.py",
+      "relation": "imports"
+    },
+    {
+      "source": "router.py",
+      "target": "Any.py",
+      "relation": "imports"
+    },
+    {
+      "source": "router.py",
+      "target": "InferenceClient.py",
+      "relation": "imports"
+    },
+    {
+      "source": "router.py",
+      "target": "Config.py",
+      "relation": "imports"
+    },
+    {
+      "source": "router.py",
+      "target": "OpenAI.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "nodes.py::_get_mock_files",
+      "relation": "defines"
+    },
+    {
+      "source": "nodes.py",
+      "target": "logging.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "time.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "shutil.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "networkx.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "numpy.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "httpx.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "Path.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "Dict.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "Any.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "List.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "cosine_similarity.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "AgentState.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "log_node_execution.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "Config.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "fuse_data.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "save_mcp_result.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "create_summarizer.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "create_analyzer.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "create_embedder.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "create_orchestrator.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "create_embedder.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "create_analyzer.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "create_visualizer.py",
+      "relation": "imports"
+    },
+    {
+      "source": "nodes.py",
+      "target": "create_recommender.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "logging.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "uuid.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "shutil.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "os.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "Path.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "datetime.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "Dict.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "Any.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "FastAPI.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "BackgroundTasks.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "HTTPException.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "AgentState.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "AnalyzeRequest.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "AnalyzeResponse.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "ResultResponse.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "get_workflow.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "Config.py",
+      "relation": "imports"
+    },
+    {
+      "source": "main.py",
+      "target": "CORSMiddleware.py",
+      "relation": "imports"
+    },
+    {
+      "source": "state.py",
+      "target": "state.py::log_node_execution",
+      "relation": "defines"
+    },
+    {
+      "source": "state.py",
+      "target": "state.py::AgentState",
+      "relation": "defines"
+    },
+    {
+      "source": "state.py",
+      "target": "TypedDict.py",
+      "relation": "imports"
+    },
+    {
+      "source": "state.py",
+      "target": "List.py",
+      "relation": "imports"
+    },
+    {
+      "source": "state.py",
+      "target": "Dict.py",
+      "relation": "imports"
+    },
+    {
+      "source": "state.py",
+      "target": "Any.py",
+      "relation": "imports"
+    },
+    {
+      "source": "state.py",
+      "target": "Optional.py",
+      "relation": "imports"
+    }
+  ],
+  "statistics": {
+    "total_files": 12
+  }
+}

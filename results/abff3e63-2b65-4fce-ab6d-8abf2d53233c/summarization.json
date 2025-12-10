@@ -1,0 +1,302 @@
+[
+  {
+    "code_id": "analyze_github.py",
+    "text": "{url}\")\nbearing print(f\"⬇️ Cloning{url}...\")\nBeing{dest}\")( \"git\" ) :\"git\" ] )()()()()()( ) :( ) )( )( )( )( )( )( )( )(",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "regenerate_result.py",
+    "text": "\"repo_path\": repo_path,\n       \"run_id\": run_id,\nAntlr \"repo_input\":,\nSpot\"state\": AgentState,\"state\" : AgentState ,: AgentState }: agent_state ,:,::::::::: agent . state: agent: agent: agent: agent:",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/config.py",
+    "text": "= os.getenv(\"OPENAI_API_URL\", \"http://openai\")\n\n   # --- Internal Services ---\n   # --- External Services ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---# ---",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/__init__.py",
+    "text": ": \"\"\"Agent Service for CodeAnalysis.\"\"\"",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/edges.py",
+    "text": "check_quality(state):\n    \"\"\"\n   ",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/schemas.py",
+    "text": "== Field(..., description=\"Description\")\n\nclass====================== Field(None,==",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/utils.py",
+    "text": "Thethe data to save.\n  :The data to(e.g., 'summarization','structural', 'structural').\n  Thethethethethethethethethethethethethethethethethe data.thethethethe data of the",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/fusion.py",
+    "text": "빠른 검색을 위한 하나로 '강화된 데이터'를 생성합니다.\n# 2. 형태 서핑 매",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/workflow.py",
+    "text": "# [New] 그래프 시각화 생성 (Visual)\nfr[New]문맥 분석 이터 수집 진입점 에 무섰,,,,",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/router.py",
+    "text": "self.provider = Config.LLM_PROVIDER\n       self.client = InferenceClient\n       = None\n\nclass WorkflowRouter:\n   = None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None= None",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/nodes.py",
+    "text": "==========================",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/main.py",
+    "text": "..........................",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "agent/state.py",
+    "text": "# --- Phase 3:```\n   ``````````````````````````````````````````````````````````````````````````````` ``````",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/semantic_embedding/models_loader.py",
+    "text": "class EmbeddingModelPool:\n    def __init__(self, device: Optional[str]=None):\n\n\nclass`````````````````` ````````````````````````````````````````````````````````````````````````````",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/semantic_embedding/__init__.py",
+    "text": ": \"\"\"Semantic Embedding MCP Code",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/semantic_embedding/embedder.py",
+    "text": "set_language(self, lang): passdef set_code(self): pass\n       set_code(): pass\nPassphrase def set_text(self:set_text()): passdef:self, code): passself,)def:self,))))()())( self , code):( self))",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/semantic_embedding/main.py",
+    "text": "로깅 임베더\nembedder = create_embedder()\n\n# =============================================",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/summarization/models_loader.py",
+    "text": "self._loaded:\n\n\nclass SummarizModelPool:\n    \"\"\"요약용 모델들을 초기화합니다.\"\"\"\n\nbearerself.pool = ModelPool(\"summarization\", device=device):\n\nbanerlogger.info(\"Initializing Summarization MCP.\")\nban",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/summarization/__init__.py",
+    "text": ": \"\"\"Summarization MCP Code summarizationService.\"\"\"",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/summarization/summarizer.py",
+    "text": "is missing via Config.HF_API_KEY.\")token =token= token.split(\",\")[0]token.split(',')[1] logger.warning(\"token is missingtoken.endswith(\".\") logger.info(\"token.startswith(\"\")) logger.error(\"Token is missingis missingis missingis missingis missingis missingis missingis missingis missing",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/summarization/main.py",
+    "text": "로깅 설정 생성\napp =. get_logger ( __name__ )=.......................",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/structural_analysis/models_loader.py",
+    "text": "= torch.model.ModelPool(device, cache_dir):\n\nclass StructuralAnalysisModelPool:\n   = torch . model .= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch= torch",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/structural_analysis/analyzer.py",
+    "text": "\"name\": \"Python\",\nc\"functio\" ,\nc\"name\" :\"type\": \"TypeScript\" }\"type\" : \"Python\" } }\"text\": {\nc\"text\"\"text\",\"text: \"C++\" }, \"type\":\"type\",, \"typing\":\"typing\" ,\"name\",\"type_type\":",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/structural_analysis/__init__.py",
+    "text": ": \"\"\"Structural Analysis MCP-Code",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/structural_analysis/main.py",
+    "text": "분석기\napp = BaseModel(\n    title=\"Structural\"Code structure analysis service\",\n    description=\"Code,\n    version=\"1.0.0\"\n)\napp= FastAPI(\nId=\"Structural Analysis MCP\",=,\nId = \"Code structure\"\nId\"=,=,,=,,,,",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/repository_analysis/models_loader.py",
+    "text": "self.pool = ModelPool(\"repository_analysis\", device=device):\n\n\nclass RepositoryAnalysisModelPool:\n   self._loaded = True= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False= False=",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/repository_analysis/analyzer.py",
+    "text": "==========================",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/repository_analysis/__init__.py",
+    "text": ": \"\"\"Repository Analysis MCP-Repository-level",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/repository_analysis/main.py",
+    "text": "분석기\napp = BaseModel(\n    title=\"Repositorydescription=\"Repository-level analysis service\",\n    version=\"1.0.0\"\n)= FastAPI(\nId=\"Repository Analysis MCP\",,\nId = \"Repository Analysis,,,,,,,,,,,,,,,,,",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/task_recommender/models_loader.py",
+    "text": "class TaskRecommenderModelPool :\n\n\nclassTaskRecommenderModelsPool:\n    def __init__(self, device: Optional[str]=None):\n\nbuilderclass:\n\nBuilderclass:None:\nbuilderbuilderclass==self.pool = ModelPool(\"task_recommender\", device=device):\nbuilderBuilderself._loaded = True= False= False= False= False",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/task_recommender/__init__.py",
+    "text": ": \"\"\"Task Recommender MCP service.\"\"\"",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/task_recommender/main.py",
+    "text": "로깅 설정\nlogger = logging.getLogger(__name__)\n\nclass= BaseModel.recommender(\n    title=\"Taskrecommender service\",\n    version=\"1.0.0\"= create_recommender()\nclass= FastAPI(\nclassName=\"Task Recommender MCP\"=========",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/task_recommender/recommender.py",
+    "text": "task_recommender.py\nGenerate actionable tasks based onthe analysis results: { \"graph\":, \"context\": ..., \"metrics\": ...},,,,,,,,,,,,,,,,,,,,,,) , \"metrics\" ,",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/graph_analysis/main.py",
+    "text": "build_graph)\n\nbuilder@app.post(\"/build-graph\")\nbuilderasync def build_graph(\n       ))()()()()()()()()",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "mcp/graph_analysis/visualizer.py",
+    "text": "# Add the subpackage directoryto thethe subpackageand os.path.exists(Config.SUBPACKAGE_DIR):\n    # Addsubpackage directory to path\n   # Addsubpackage# Add subpackagesubpackage# Addsubpackage toif. path . exists () :\n    sys.path. append ( os .)\n   ). append). append",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "shared/model_utils.py",
+    "text": "model_utils.py\nModel()\n\nclass model_utils:\nclass ModelPool:\nClassModelPool(token=token, token=token)\nclassModelPool.get_hf_client():\nClass ModelPool.set_model_pool(modelpool=ModelPool)\nClass model_pool_class(modelPool=modelPool)modelPool.add_modelpool()\nclassmodelPool.__class__.__name",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "shared/__init__.py",
+    "text": ": \"\"\"summary: \"\"\"Summary of code analysis",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "shared/ast_utils.py",
+    "text": "file_path: str 분석합니다.\n\n\nclass PythonASTAnalyzer:\nclass`````````````````````` ``````````````````````````````````````````````````````````````````",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "shared/file_utils.py",
+    "text": "file_utils.py\nFile ( repo_path: str, extensions: Optional[List[str]]=None,file_files: List[str]:\n\n    if files.count()>0:files.append(files.join(list_files(repo_path, extensions, exclude_dirs))files.extend(files) else : files =files.sort(key=lambda x: x.split('.'))files",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/util/preprocess_data.py",
+    "text": "is_scope(line):is_line_number=False,\n   is_space(line)is_no_line=True,\nis_block_number:is_symbol(line: str,is_variable(line))is_function(line, is_scope):is_class(line).endswith('\\n'):is_string(line.strip())is_type(line",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/util/api_requests.py",
+    "text": "= len(encoding.encode(message[0][\"content\"])))num_tokens = len ( encoding= len ([ \"content\" ] ) )= len= len= len==== len= len============ len= len=",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/util/postprocess_data.py",
+    "text": "remove_empty_lines(code):\n   (code:str):\nAllowable(code)\nAllowable):",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/util/utils.py",
+    "text": "JSONL file to write\n\n\n   json.loads(data)JSONLdata:\n        return [json.dumps(data))json.load(data,jsonjson.dump(data):\n       jsonJSONLJSONLJSONLJSONLJSONLJSONLJSONLJSONLJSONLJSONLJSONLJSONLJSONLJSONLJSON",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/util/parse_global_var.py",
+    "text": "if m.matches(stmt, m.SimpleStatementLine()) andmatches(\n          ,m.SimpleExpressionLine()) : assigns.append(stmt) ifmatches(m.simpleStatementLine() andm.matchers.PositionProvider(stmt):\ny assigns.push(stmt.body.body:\ny assign.push([stmt.name, stmt.name]), m.simpleExpressionLine()])m.Matches(stmt",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/util/compress_file.py",
+    "text": "stmt\nstmt\nstmt . bodystmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .stmt .",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/fl/FL.py",
+    "text": ") : self .instance_id, structure, problem_statement, **, **, **, **, **, **, **, **, **, **, **, **, **, **, **, **, **, **, ** , **, **, **, **, **, **, **",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/fl/localize.py",
+    "text": "load_jsonl\nfrom agentless.util.utils import load_json,\n   load_file_paths_and_classesload_out_test_files ,\n   get_project_st_structure,\nget_repo_structureload_data ,load_dataset ,load_datasets , load_dataset, load_datasetsload_filesload_all_filesload_listload_",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/get_repo_structure/get_patch_info.py",
+    "text": "line.startswith(\"hunk\") :line.endswith(\"diff\") :\n\nline.split(\"\\n\")line.replace(\"diff \" ,\"\")\n\nline.strip()\n\nline_lines[0] =line.rstrip(\"\\n\"))\n\nline.lstrip()=============",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/get_repo_structure/get_repo_structure.py",
+    "text": "\"pytest-dev/pytest\": \"pytest\",\n    \"pydata/xarray\": \"xarray\",\"ydata/yarray\":\"pydata-xarray\" : \"ydata\",\"yarray/ydata\": \"yarray\",\"pydataset/pydata\":\"xarray/xdata\":\"xdata\" ,\n   \"pyfile/pyfile\":\"yfile/y",
+    "level": "file",
+    "model": "codet5-small-local"
+  },
+  {
+    "code_id": "models/RepoGraph/agentless/repair/repair.py",
+    "text": "parse_code_differ_by_just_empty_lines,\n    parse_syntax_diff_edit,\n,\n,,,,,,,,,,,,,,,,,,,,,,,,",
+    "level": "file",
+    "model": "codet5-small-local"
+  }
+]

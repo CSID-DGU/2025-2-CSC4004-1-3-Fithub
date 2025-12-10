@@ -64,11 +64,22 @@ class CodeSummarizer:
         """[Local SLM] 로컬 모델을 사용한 요약 (CodeT5-small)"""
         try:
             from transformers import pipeline
-            
+            import torch
+
             # 파이프라인 캐싱 (싱글톤 패턴)
             if not hasattr(self, '_local_pipeline'):
                 logger.info("Loading local summarization model (Salesforce/codet5-small)...")
-                self._local_pipeline = pipeline("summarization", model="Salesforce/codet5-small", device=-1) # CPU
+                
+                # Device Auto-detection
+                device = -1 # CPU Default
+                if torch.backends.mps.is_available():
+                    device = "mps"
+                    logger.info("🚀 Using MPS (Metal) acceleration on macOS.")
+                elif torch.cuda.is_available():
+                    device = 0
+                    logger.info("🚀 Using CUDA acceleration.")
+                
+                self._local_pipeline = pipeline("summarization", model="Salesforce/codet5-small", device=device)
             
             # 입력 길이 제한 (CodeT5 max position embedding is usually 512)
             input_code = code[:512] 
@@ -79,11 +90,12 @@ class CodeSummarizer:
             logger.error(f"Local summarization failed: {e}")
             return "Local summary generation failed."
 
-    def summarize_repository(self, repo_path: str, max_files: int = Config.MAX_ANALYSIS_FILES) -> Dict[str, Any]:
-        """저장소 전체 앙상블 요약 (다국어 지원)"""
+        
+    def summarize_repository(self, repo_path: str, max_files: int = Config.MAX_ANALYSIS_FILES, target_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+        """저장소 전체 앙상블 요약 (다국어 지원 & 선별적 재분석)"""
         try:
             repo_path = Path(repo_path)
-            target_files = []
+            all_files = []
 
             # 파일 검색
             for root, dirs, files in os.walk(repo_path):
@@ -91,10 +103,20 @@ class CodeSummarizer:
                 dirs[:] = [d for d in dirs if not d.startswith('.') and d not in {'venv', 'node_modules', 'dist', 'build', '.git'}]
                 for file in files:
                     if Path(file).suffix in self.valid_exts:
-                        target_files.append(Path(root) / file)
+                        all_files.append(Path(root) / file)
 
-            # 파일 수 제한
-            target_files = target_files[:max_files]
+            target_files = []
+            
+            # [Filtering Logic]
+            if target_ids:
+                logger.info(f"Targeted Analysis Mode: Filtering {len(target_ids)} files.")
+                for f in all_files:
+                    fid = str(f.relative_to(repo_path)).replace("\\", "/")
+                    if fid in target_ids:
+                        target_files.append(f)
+            else:
+                target_files = all_files[:max_files]
+
             file_summaries = []
 
             logger.info(f"Ensemble summarizing {len(target_files)} files in {repo_path}")
@@ -108,9 +130,19 @@ class CodeSummarizer:
                     code_id = str(file_path.relative_to(repo_path)).replace("\\", "/")
 
                     # ★ 앙상블 호출 (기존 단일 호출 대체)
-                    ensemble_result = self._generate_ensemble_summary(code[:2000], code_id)
-
-                    file_summaries.append(ensemble_result)
+                    if True or Config.USE_LOCAL_SUMMARIZER: # FORCE LOCAL FOR DEMO
+                        # [Local Mode] Single Pass CodeT5 (No Ensemble to save time/resources)
+                        local_text = self.summarize_code_local(code)
+                        file_summaries.append({
+                            "code_id": code_id,
+                            "text": local_text,
+                            "level": "file",
+                            "model": "codet5-small-local"
+                        })
+                    else:
+                        # [Cloud Mode] Ensemble
+                        ensemble_result = self._generate_ensemble_summary(code[:2000], code_id)
+                        file_summaries.append(ensemble_result)
 
                 except Exception as e:
                     logger.warning(f"Failed to summarize {file_path}: {e}")
@@ -120,7 +152,8 @@ class CodeSummarizer:
                 "file_summaries": file_summaries,
                 "metadata": {
                     "total_files": len(target_files),
-                    "ensemble_mode": True
+                    "ensemble_mode": True,
+                    "partial_retry": bool(target_ids)
                 },
                 "statistics": {"total_files": len(target_files)}
             }
@@ -128,15 +161,12 @@ class CodeSummarizer:
             logger.error(f"Repo summary failed: {e}")
             return {"error": str(e)}
 
-    def _generate_ensemble_summary(self, code: str, code_id: str) -> Dict[str, Any]:
-        """3개 모델 앙상블 요약 생성"""
+    def _generate_ensemble_summary(self, code: str, code_id: str, ast_metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+        """3개 모델 앙상블 요약 생성 (AST 메타데이터 활용)"""
         try:
             # 1. 3개 Expert 호출 (각각 다른 관점)
-            logic_summary = self._generate_summary(
-                code,
-                self.model_logic,
-                prompt_type="logic"
-            )
+            # [Logic Expert] Local CodeT5 (Fast & Efficient) - User Request
+            logic_summary = self.summarize_code_local(code)
 
             intent_summary = self._generate_summary(
                 code,
@@ -144,8 +174,14 @@ class CodeSummarizer:
                 prompt_type="intent"
             )
 
+            # [Structure Expert] Qwen API + AST Context (Enhanced)
+            structure_context = code
+            if ast_metadata:
+                # Enhance context with pre-extracted AST info
+                structure_context = f"Detected Structure Metadata:\n- Complexity: {ast_metadata.get('complexity', '?')}\n- Imports: {ast_metadata.get('imports', [])}\n- Classes: {ast_metadata.get('classes', [])}\n\nCode:\n{code}"
+            
             structure_summary = self._generate_summary(
-                code,
+                structure_context,
                 self.model_structure,
                 prompt_type="structure"
             )
@@ -239,6 +275,14 @@ class CodeSummarizer:
 
     def _generate_summary_via_chat(self, prompt: str, model_id: str) -> str:
         """HF Chat Completion API 호출 (Instruct 모델용)"""
+        if "starcoder" in model_id.lower():
+            # StarCoder is completion-based usually, but StarCoder2-Instruct exists.
+            # Assuming pure completion for base StarCoder2.
+             messages = prompt # Pass string directly? No, client.chat_completion needs messages. 
+             # Let's try text_generation for non-instruct StarCoder.
+             # If "is_chat_model" logic caught it, it means we treat it as chat.
+             pass 
+
         messages = [{"role": "user", "content": prompt}]
         try:
             response = self.client.chat_completion(
@@ -248,6 +292,9 @@ class CodeSummarizer:
                 temperature=0.2
             )
             return response.choices[0].message.content.strip()
+        except Exception as e:
+             # Fallback to text_generation if chat fails (common for non-instruct models)
+             return self.client.text_generation(prompt, model=model_id, max_new_tokens=200)
         except Exception as e:
             raise e
 
@@ -277,6 +324,33 @@ class CodeSummarizer:
                     logger.warning(f"Throttling HF API: Waiting {wait_time}s before retry {attempt+1}...")
                     time.sleep(wait_time) 
                 
+                # [Unified Role-Based Dispatch]
+                # Since we use Qwen (Instruct Model) for all roles, we simply use the role prompt.
+                if getattr(Config, 'USE_ROLE_BASED_ENSEMBLE', False):
+                    # Specialized System Role Prompts for Qwen
+                    system_roles = {
+                        "logic": "You are a Code Logician. Analyze the code's logic, inputs, and outputs precisely.",
+                        "intent": "You are a Senior Product Manager. Explain the business purpose and intent of this code.",
+                        "structure": "You are a Software Architect. Describe the structural patterns, class hierarchy, and complexity.",
+                        "general": "You are a generic code summarizer."
+                    }
+                    role_msg = system_roles.get(prompt_type, system_roles["general"])
+                    
+                    # Construct Chat Messages with System Role
+                    messages = [
+                        {"role": "system", "content": role_msg},
+                        {"role": "user", "content": prompt}
+                    ]
+                    
+                    response = self.client.chat_completion(
+                        messages,
+                        model=model_id,
+                        max_tokens=200,
+                        temperature=0.2
+                    )
+                    return response.choices[0].message.content.strip()
+                
+                # [Legacy/Compatibility Mode]
                 if is_chat_model:
                      return self._generate_summary_via_chat(prompt, model_id)
                 else:
@@ -294,15 +368,40 @@ class CodeSummarizer:
                 if attempt == max_retries - 1:
                     break # Final failure, proceed to fallback
 
-        # [Fallback] Mock Summary for Demo/Testing when API is unavailable
-        logger.error(f"HF API Failed after {max_retries} attempts. Using Fallback.")
-        mock_summaries = {
-            "logic": "Analyzes input data and transforms it using a core algorithm to produce the desired output.",
-            "intent": "Facilitates data processing to support the main business logic of the application.",
-            "structure": "Modular function designed with error handling and clean separation of concerns.",
-            "general": "Handles core functionality with robust error checking and data validation."
+        # [Fallback Hierarchy]
+        # [Fallback Hierarchy]
+        # 1. API Failed/Circuit Open -> Check GPU.
+        # 2. If GPU (CUDA/MPS) exists -> Try Local CodeT5.
+        # 3. If No GPU (CPU only) -> Skip to Dummy (Too slow).
+        # 4. If Local Failed -> Dummy Data.
+        
+        logger.warning(f"HF API Failed (or Circuit Tripped). Checking logic for Fallback...")
+        
+        try:
+            import torch
+            has_gpu = torch.cuda.is_available() or (hasattr(torch.backends, 'mps') and torch.backends.mps.is_available())
+            
+            if has_gpu:
+                 logger.info("🚀 GPU Detected. Attempting Local CodeT5 Fallback...")
+                 local_summary = self.summarize_code_local(code)
+                 return f"[Local Fallback (GPU)] {local_summary}"
+            else:
+                 logger.warning("⚠️ No GPU detected. Skip Local Model (CPU too slow). Using Dummy Data.")
+                 return self._get_dummy_summary(prompt_type)
+
+        except Exception as e:
+             logger.warning(f"Local Fallback/GPU Check failed: {e}. Using Dummy Data.")
+             return self._get_dummy_summary(prompt_type)
+
+    def _get_dummy_summary(self, prompt_type: str) -> str:
+        """[Safety Net] 통신 테스트용 더미 데이터 반환"""
+        dummies = {
+            "logic": "Input: Data -> Process: Validation -> Output: Result. (Dummy Logic)",
+            "intent": "To process user requests and return valid responses. (Dummy Intent)",
+            "structure": "Class MainController -> Method handle_request. (Dummy Structure)",
+            "general": "This code performs a specific system function. (Dummy Summary)"
         }
-        return mock_summaries.get(prompt_type, "Summary generation failed.")
+        return f"[Dummy Fallback] {dummies.get(prompt_type, dummies['general'])}"
 
 def create_summarizer(device: Optional[str] = None) -> CodeSummarizer:
     return CodeSummarizer(device=device)

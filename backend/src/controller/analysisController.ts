@@ -1,3 +1,6 @@
+//현재 문제:task_output.json 파일이 반환되지 않음 -> json 파일을 잘 읽어오는지 여부 test가 안 됨
+//structural.json: 그래프 정보 , summarization.json: 요약 정보 , task_output.json: task 정보
+
 import axios from "axios";
 import fs from "fs";
 import path from "path";
@@ -49,7 +52,7 @@ export const getAnalysisStatus = async (req: Request, res: Response) => {
   try {
     const { runId } = req.params;
     //results 파일 경로: backend/results
-    const baseDir = path.join(__dirname, "../../results", runId);
+    const baseDir = path.join(__dirname, "../../../results", runId);
 
     //structural.json: 그래프 정보 , summarization.json: 요약 정보 , task_output.json: task 정보
     const structural = path.join(baseDir, "structural.json");
@@ -92,7 +95,7 @@ export const getAnalysisResult = async (req: Request, res: Response) => {
 
     if (!repoId || !projectId) return res.status(400).json({ error: "Invalid runId mapping" });
 
-    const baseDir = path.join(__dirname, "../../results", runId);
+    const baseDir = path.join(__dirname, "../../../results", runId);
     const structuralPath = path.join(baseDir, "structural.json");
     const summaryPath = path.join(baseDir, "summarization.json");
     const tasksPath = path.join(baseDir, "task_output.json");

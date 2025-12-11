@@ -62,7 +62,7 @@ async def fetch_from_backend_node(state: AgentState) -> Dict[str, Any]:
         try:
             async with httpx.AsyncClient() as client:
                 # 타임아웃 설정 (대용량 레포지토리 고려)
-                res = await client.get(f"{Config.BACKEND_API_URL}/repos/{repo_id}/files", timeout=60.0)
+                res = await client.get(f"{Config.BACKEND_API_URL}/github/repos/{repo_id}/files", timeout=60.0) # 엔드포인트 수정
                 if res.status_code == 200:
                     files = res.json()
                     logger.info(f"Successfully fetched {len(files)} files from backend.")

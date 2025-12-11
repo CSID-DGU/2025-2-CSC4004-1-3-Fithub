@@ -17,7 +17,8 @@ class CodeSummarizer:
         if not token:
             logger.warning("HF_API_KEY is missing via Config.")
 
-        self.client = InferenceClient(token=token)
+        # self.client = InferenceClient(token=token)
+        self.client = None # Force disable API client
         self.model_id = Config.MODEL_SUMMARIZER
 
         # 3개 Expert 모델 ID

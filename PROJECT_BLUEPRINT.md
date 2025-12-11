@@ -23,8 +23,48 @@
     -   **역할:** "장비". 작업자가 꺼내 쓰는 라이브러리입니다.
     -   **위치:** `mcp/*`
 
-![Architecture Diagram](https://mermaid.ink/img/pako:eNptkctqwzAQRX9FzKqF_IAeCwmUbiQfbZPSLgY9WonIkkFScULIv3fsOE0K3c29c-6MNDP0RjPo-WvVme_Wt4N5Mca-vjqm9kfY707gweH4sDvAjS2gM3Z3gMvT8fQIr9tT_wCXl8PDD3g9P53P4O1y_HiE9_3-vId3-8N-D5_3x_M9fDwcju_h8_l8eYQ_t_v9O3w-n69P8O_2dPgIfz4ez0_w5Xh8OMK_t_vjE_z7fD4_wZ_b_fkT_L09Hz7C3/v9+Qn+3O73H_Dv9nT4CH9u9_t3+Hw+X5_g3+3p8BH+3O73H_Dv9nT4CP9u9_t3+Hw+X5_g3+3p8BH+fD6fn+DL8fhw_H8AAAD__w)
-*(Agent -> Workflow -> Tools 시각화)*
+```mermaid
+graph TD
+    %% [Level 1: The Brain]
+    subgraph "Level 1: The Brain (Agent Layer)"
+        Orch["<b>🎩 Orchestrator</b><br>(Manager Agent)<br><i>agent/orchestrator.py</i>"]
+    end
+
+    %% [Level 2: The Hands]
+    subgraph "Level 2: The Hands (Worker/Node Layer)"
+        direction TB
+        W_Struct["<b>🅰️ Structure Worker</b><br>(build_graph_node)"]
+        W_Logic["<b>🅱️ Logic Worker</b><br>(summarize_node)"]
+        W_Vector["<b>🆎 Vector Worker</b><br>(embed_code_node)"]
+        
+        W_Context["<b>🏗️ Context Architect</b><br>(analyze_repo_node)"]
+        W_Visual["<b>🎨 Visualizer</b><br>(generate_graph_node)"]
+    end
+
+    %% [Level 3: The Tools]
+    subgraph "Level 3: The Tools (MCP Tool Layer)"
+        T_Struct["<b>🛠️ structural_analysis</b><br>(Tree-sitter/Regex)"]
+        T_Logic["<b>🛠️ summarization</b><br>(CodeT5/LLM)"]
+        T_Vector["<b>🛠️ semantic_embedding</b><br>(GraphCodeBERT)"]
+        T_Repo["<b>🛠️ repository_analysis</b><br>(RepoCoder/Tags)"]
+        T_Graph["<b>🛠️ graph_analysis</b><br>(RepoGraph/GNN)"]
+    end
+
+    %% Wiring - Command Flow
+    Orch ==>|1. Dispatch Parallel| W_Struct
+    Orch ==>|1. Dispatch Parallel| W_Logic
+    Orch ==>|1. Dispatch Parallel| W_Vector
+    
+    Orch ==>|2. Build Context| W_Context
+    Orch ==>|3. Visualize| W_Visual
+
+    %% Wiring - Tool Usage
+    W_Struct -.->|Uses| T_Struct
+    W_Logic -.->|Uses| T_Logic
+    W_Vector -.->|Uses| T_Vector
+    W_Context -.->|Uses| T_Repo
+    W_Visual -.->|Uses| T_Graph
+```
 
 ---
 
@@ -105,13 +145,13 @@
 ## 3. 🤖 작업자 분대 상세 (The Worker Squads)
 > ✅ **구현 확인 완료:** `mcp/*`
 
-### 🅰️ 구조팀: 설계자 (Structure)
+### 🅰️ 구조팀: 설계자 (Structure Worker)
 -   **목표:** 청사진 그리기 (클래스, 함수, 임포트 관계).
 -   **무기:**
     -   **Python:** `ast` 라이브러리 (정확도 100%).
     -   **다국어 (JS/Java/Go 등):** `Polyglot` 정규식 패턴 (`analyzer.py` 확인됨).
 
-### 🅱️ 논리팀: 작가 (Logic Summarization)
+### 🅱️ 논리팀: 작가 (Logic Worker)
 -   **목표:** 코드가 '무엇'을하고 '왜' 하는지 설명.
 -   **무기 (하이브리드 앙상블):**
     -   **논리 전문가:** `CodeT5` (Local). 빠르고 전술적.
@@ -119,7 +159,7 @@
     -   **구조 전문가:** `Qwen` + `AST Metadata`.
 -   **출력:** `{"unified_summary": "String", "expert_views": {JSON}}` (Hybrid 포맷 확인됨).
 
-### 🆎 벡터팀: 수학자 (Semantic Embedding)
+### 🆎 벡터팀: 수학자 (Vector Worker)
 -   **목표:** 검색을 위한 수치화.
 -   **무기:** `Microsoft/graphcodebert-base` (Local).
 -   **출력:** 768차원 실수 벡터 (`List[float]`).
@@ -252,3 +292,96 @@ graph TD
 1.  **Fast (빠름):** 병렬 실행 (`workflow.py`).
 2.  **Smart (똑똑함):** 인지적 판단 및 전략 수정 (`orchestrator.py`).
 3.  **Efficient (효율적):** 선별적 재시도 (`Surgical Retry`).
+
+---
+
+## 7. 🏛️ 시스템 구현 아키텍처 (System Implementation Architecture)
+
+> **[Added Version]** 사용자 피드백을 반영하여 구체화된 **Client-Backend 분리 아키텍처**와 **상세 모델 스펙**입니다.
+
+### 7.1. C/S 분리 구조 (Client-Backend Partitioning)
+
+사용자의 요청(Client)에서 시작하여 오케스트레이터(Agent)가 5개의 전문 MCP를 지휘하는 구조입니다.
+
+```mermaid
+graph TD
+    %% [Client & Backend Interface]
+    Client((User Client)) -->|POST /analyze| AgentAPI["<b>Agent Service (API)</b><br>FastAPI + Orchestrator + Metrics"]
+    
+    %% [Core MCP Layer - Parallel Execution (Workers)]
+    AgentAPI -->|Task Dispatch| Structure["<b>structural_analysis_mcp</b><br>(Structure Worker)"]
+    AgentAPI -->|Task Dispatch| Summary["<b>summarization_mcp</b><br>(Logic Worker: CodeT5 + LLM)"]
+    AgentAPI -->|Task Dispatch| Vector["<b>semantic_embedding_mcp</b><br>(Vector Worker)"]
+    
+    %% [Context & Vis Layer (Architects)]
+    AgentAPI -->|Context Build| RepoMCP["<b>repository_analysis_mcp</b><br>(Context Architect)"]
+    AgentAPI -->|Vis Build| GraphMCP["<b>graph_analysis_mcp</b><br>(Visualizer)"]
+
+    %% [Data Fusion & Storage]
+    Structure & Summary & Vector --> FusedResult["<b>Fused Data Pool</b><br>(Graph + Summary + Vector)"]
+    
+    FusedResult --> RepoMCP
+    RepoMCP --> GraphMCP
+    GraphMCP --> ArtifactStore[("<b>Artifact Store</b><br>S3 / Local Volume")]
+    
+    ArtifactStore -->|Response: JSON/Links| AgentAPI
+    AgentAPI -->|Final Response| Client
+```
+
+### 7.2. 역할 분리 (Separation of Concerns)
+
+| **구성 요소** | **역할** |
+| --- | --- |
+| **Agent Service (API)** | **중앙 관제탑**. 외부 요청을 받고, MCP들을 지휘(Orchestration)하며, 결과를 병합합니다. (`agent/orchestrator.py`) |
+| **Orchestrator** | **뇌(Brain)**. 분석 파이프라인의 실행 순서(병렬/재시도/앙상블)를 관리하고 품질 임계치를 판단하여 **지능적 재시도(Surgical Retry)**를 명령합니다. |
+| **MCP Tools** | **전문가 집단(Body)**. 각자 독립된 컨테이너에서 코드 구조 추출, 요약, 임베딩, 평가를 수행합니다. |
+| **Artifact Store** | **기억 저장소**. 최종 그래프(JSON), 요약(MD), 리포트 등을 저장하고 링크를 제공합니다. |
+
+### 7.3. 상세 MCP 툴 스펙 (Detailed Tool Specs)
+
+#### 1️⃣ structural_analysis_mcp (Structure Worker)
+-   **폴더:** `mcp/structural_analysis/`
+-   **역할:** 코드 내부의 **구조적 관계(Imports, Calls, Inherits)**를 그래프로 추출.
+-   **모델/엔진:** `GraphCodeBERT` (Semantics), `Tree-sitter` (Syntax), `Pyan`(Python AST).
+-   **Output:** `CodeGraph(nodes, edges)`.
+
+#### 2️⃣ summarization_mcp (Logic Worker)
+-   **폴더:** `mcp/summarization/`
+-   **역할:** **하이브리드 요약 (Local + Cloud)**. 빠른 CodeT5 요약과 깊이 있는 LLM 요약을 통합 수행.
+-   **모델:** `CodeT5+` (Local), `Qwen2.5/GPT` (LLM).
+-   **특징:** 내부적으로 '논리/의도/구조' 3가지 전문가 모드로 동작하여 앙상블 요약 생성.
+
+#### 3️⃣ semantic_embedding_mcp (Vector Worker)
+-   **폴더:** `mcp/semantic_embedding/`
+-   **역할:** 검색을 위한 수치화.
+-   **모델:** `Microsoft/graphcodebert-base`.
+
+#### 4️⃣ metrics (Internal Module)
+-   **위치:** `agent/orchestrator.py` & `agent/nodes.py` (Internal Logic)
+-   **역할:** MCP가 아닌 **에이전트 내부 로직**으로, 품질을 정량적으로 평가하고 **재시도 루프**를 트리거.
+-   **지표:** Cosine Similarity, CodeBLEU.
+-   **Action:** 임계치 미달 시 Orchestrator에게 `Refine` 신호 전달.
+
+#### 5️⃣ repository_analysis_mcp (Context Architect)
+-   **역할:** 프로젝트 전역 문맥(Context) 형성 및 메타데이터(Domain, Layer) 태깅.
+-   **모델:** `RepoCoder` (Search), `Mistral-7B` (Tagging).
+-   **Output:** `ContextMetadata` (Color, Group, Implicit Edges).
+
+#### 6️⃣ graph_analysis_mcp (Visualizer)
+-   **역할:** 최종 시각화용 노드/엣지 계산.
+-   **모델:** `RepoGraph` (GNN for Importance), `NetworkX` (Layout).
+-   **Output:** `VisualJSON` (D3.js compatible).
+
+#### 7️⃣ task_recommender_mcp (컨설팅 팀 - Optional)
+-   **역할:** "어디부터 고쳐야 하는가?" (Refactoring Hotspot) 제안.
+-   **모델:** `Graph Embedding (node2vec)` + `CodeBERT Similarity`.
+-   **Output:** 우선순위 태스크 리스트 (e.g., "High Coupling Module Detected").
+
+### 7.4. 모델 간 상호 강화 (Interaction Strategy)
+
+| Source | Target | Interaction Effect |
+| :--- | :--- | :--- |
+| **LLM Summary** | **Static Graph** | 그래프 노드에 자연어 요약을 메타데이터로 주입 → **"설명 가능한 그래프"** |
+| **Static Graph** | **LLM Summary** | 함수 호출 관계를 프롬프트에 제공 → **"문맥을 아는 요약"** |
+| **Embedding** | **Metrics** | 벡터 유사도로 요약 품질 검증 (CodeBERT Score) → **"자동 품질 보증"** |
+| **RepoGraph** | **Visualizer** | 전역 중요도(PageRank)로 노드 크기 결정 → **"중요한게 크게 보이는 뷰"** |

@@ -48,7 +48,7 @@ class TaskRecommender:
         target_pool_size = 20
         
         # Node IDs for Grounding Check
-        graph = analysis_results.get("graph", {})
+        graph = analysis_results.get("graph") or {}
         nodes = graph.get("nodes", [])
         node_ids = {n['id'] for n in nodes}
 
@@ -169,14 +169,16 @@ Return ONLY a JSON object with the list of selected IDs:
                 )
                 content = response.choices[0].message.content
             else:
-                response = self.client.text_generation(
-                    prompt,
+                response = self.client.chat_completion(
+                    messages=[
+                        {"role": "system", "content": "You are a helpful software architect."},
+                        {"role": "user", "content": prompt}
+                    ],
                     model=self.model_id,
-                    max_new_tokens=200,
-                    temperature=0.1,
-                    return_full_text=False
+                    max_tokens=200,
+                    temperature=0.1
                 )
-                content = response
+                content = response.choices[0].message.content
 
             clean_json = content.strip()
             if clean_json.startswith("```json"):
@@ -212,8 +214,8 @@ Return ONLY a JSON object with the list of selected IDs:
         # ... (Existing logic) ...
         recommendations = []
         try:
-            graph = analysis_results.get("graph", {})
-            context = analysis_results.get("context", {}).get("file_metadata", {})
+            graph = analysis_results.get("graph") or {}
+            context = (analysis_results.get("context") or {}).get("file_metadata", {})
             nodes = graph.get("nodes", [])
             edges = graph.get("edges", [])
             node_ids = {n['id'] for n in nodes}
@@ -252,11 +254,21 @@ Return ONLY a JSON object with the list of selected IDs:
                 summary = node.get("summary_text", "")
                 loc = node.get("loc", 10)
 
-                if importance > 50 and complexity > 20:
+                # Decoupled checks for broader coverage
+                if importance > 50:
                     recommendations.append({
                         "target": node['id'],
-                        "reason": "High complexity in critical file. Consider splitting.",
+                        "reason": f"High importance module (Size: {int(importance)}). Consider reviewing for modularization.",
                         "priority": "Medium",
+                        "related_entities": [],
+                        "type": "refactor_needed"
+                    })
+
+                if complexity > 20:
+                    recommendations.append({
+                        "target": node['id'],
+                        "reason": f"High complexity ({complexity}). Refactoring recommended.",
+                        "priority": "High",
                         "related_entities": [],
                         "type": "refactor_needed"
                     })
@@ -270,10 +282,19 @@ Return ONLY a JSON object with the list of selected IDs:
                         "type": "todo_detected"
                     })
 
-                if complexity == 0 and loc < 5:
+                if not summary or summary.strip() == "":
                      recommendations.append({
                         "target": node['id'],
-                        "reason": "Empty or minimal implementation detected.",
+                        "reason": "Missing documentation/summary.",
+                        "priority": "Low",
+                        "related_entities": [],
+                        "type": "documentation_needed"
+                    })
+
+                if complexity == 0 and loc < 5 and loc > 0:
+                     recommendations.append({
+                        "target": node['id'],
+                        "reason": "Minimal implementation detected.",
                         "priority": "Medium",
                         "related_entities": [],
                         "type": "empty_implementation"
@@ -287,8 +308,8 @@ Return ONLY a JSON object with the list of selected IDs:
     def _recommend_with_llm(self, analysis_results: Dict[str, Any], limit: int = 20) -> List[Dict[str, Any]]:
         """Generate semantic task recommendations using LLM (Diversity Strategy)."""
         import random
-        graph = analysis_results.get("graph", {})
-        context = analysis_results.get("context", {}).get("file_metadata", {})
+        graph = analysis_results.get("graph") or {}
+        context = (analysis_results.get("context") or {}).get("file_metadata", {})
         nodes = graph.get("nodes", [])
 
         if not nodes:
@@ -354,14 +375,16 @@ Return ONLY a JSON object with this structure:
                 )
                 content = response.choices[0].message.content
             else:
-                response = self.client.text_generation(
-                    prompt,
+                response = self.client.chat_completion(
+                    messages=[
+                        {"role": "system", "content": "You are a helpful software architect. Assign a confidence score (0-100) to each recommendation."},
+                        {"role": "user", "content": prompt}
+                    ],
                     model=self.model_id,
-                    max_new_tokens=1000,
-                    temperature=0.2,
-                    return_full_text=False
+                    max_tokens=1000,
+                    temperature=0.2
                 )
-                content = response
+                content = response.choices[0].message.content
 
             clean_json = content.strip()
             if clean_json.startswith("```json"):

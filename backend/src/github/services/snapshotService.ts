@@ -68,6 +68,18 @@ export const snapshotService = {
           console.error("Blob fetch failed:", f.path, err);
         }
 
+        //binary(NULL 포함) 파일 감지 → skip
+
+        if (contentText.includes("\u0000")) {
+          console.log("Skipping binary file:", f.path);
+          continue;
+        }
+
+        //문자열 내부 NULL 제거 (텍스트 파일에서만)
+
+        contentText = contentText.replace(/\u0000/g, "");
+
+        // DB 저장
         await prisma.file.create({
           data: {
             repo_id: savedRepo.repo_id,
@@ -75,7 +87,7 @@ export const snapshotService = {
             sha: f.sha,
             size: f.size ?? null,
             type: f.type,
-            content: contentText, 
+            content: contentText,
           },
         });
       }

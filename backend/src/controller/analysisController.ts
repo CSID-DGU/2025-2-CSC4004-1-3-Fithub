@@ -1,6 +1,3 @@
-//현재 문제:task_output.json 파일이 반환되지 않음 -> json 파일을 잘 읽어오는지 여부 test가 안 됨
-//structural.json: 그래프 정보 , summarization.json: 요약 정보 , task_output.json: task 정보
-
 import axios from "axios";
 import fs from "fs";
 import path from "path";

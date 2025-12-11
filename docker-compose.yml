@@ -14,6 +14,8 @@ services:
     volumes:
       - ./models:/app/models
       - ./shared:/app/shared
+      - ./results:/app/results
+      - ./temp_repos:/app/temp_repos
       - /tmp/code_analysis_repos:/tmp/code_analysis_repos
     environment:
       - PYTHONUNBUFFERED=1

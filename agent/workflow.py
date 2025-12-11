@@ -49,14 +49,16 @@ def create_workflow() -> StateGraph:
     # 진입점: 백엔드에서 데이터 가져오기
     workflow.set_entry_point("ingest")
 
-    # Ingest -> 병렬 실행 시작
+    # Ingest -> Summarize
     workflow.add_edge("ingest", "summarize")
-    workflow.add_edge("ingest", "build_graph")
-    workflow.add_edge("ingest", "embed_code")
-
-    # 병렬 실행 종료 -> Fusion
-    workflow.add_edge("summarize", "fusion")
-    workflow.add_edge("build_graph", "fusion")
+    
+    # Summarize -> Build Graph
+    workflow.add_edge("summarize", "build_graph")
+    
+    # Build Graph -> Embed Code
+    workflow.add_edge("build_graph", "embed_code")
+    
+    # Embed Code -> Fusion
     workflow.add_edge("embed_code", "fusion")
 
     # Fusion -> 평가
@@ -74,7 +76,7 @@ def create_workflow() -> StateGraph:
 
     # 재분석 루프 (옵션만 조정해서 다시 요약/임베딩)
     workflow.add_edge("refine", "summarize")
-    workflow.add_edge("refine", "embed_code")
+    # workflow.add_edge("refine", "embed_code") # Removed to avoid fan-out error
 
     # 문맥 분석 -> 그래프 생성 -> 종합 -> 끝
     workflow.add_edge("analyze_repo", "generate_graph")

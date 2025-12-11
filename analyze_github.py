@@ -12,18 +12,27 @@ from agent.state import AgentState
 
 TEMP_BASE = Path("temp_repos")
 
+import os
+import stat
+
+def remove_readonly(func, path, excinfo):
+    """Clear the readonly bit and reattempt the removal"""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
 def clone_repo(url: str, dest: Path):
     """Clone a git repository to a destination path."""
     if dest.exists():
-        print(f"🧹 Clearing existing directory: {dest}")
-        shutil.rmtree(dest)
+        print(f"Clearing existing directory: {dest}")
+        # Use onerror to handle read-only files on Windows
+        shutil.rmtree(dest, onerror=remove_readonly)
     
-    print(f"⬇️ Cloning {url}...")
+    print(f"Cloning {url}...")
     try:
         subprocess.check_call(["git", "clone", "--depth", "1", url, str(dest)])
-        print("✅ Clone successful.")
+        print("Clone successful.")
     except subprocess.CalledProcessError as e:
-        print(f"❌ Clone failed: {e}")
+        print(f"Clone failed: {e}")
         sys.exit(1)
 
 async def analyze_repo(repo_url: str):
@@ -37,7 +46,7 @@ async def analyze_repo(repo_url: str):
     
     # 2. Setup State
     run_id = str(uuid.uuid4())
-    print(f"🚀 Starting analysis for: {repo_name} (RunID: {run_id})")
+    print(f"Starting analysis for: {repo_name} (RunID: {run_id})")
     
     initial_state: AgentState = {
         "run_id": run_id,
@@ -60,29 +69,51 @@ async def analyze_repo(repo_url: str):
     workflow = get_workflow()
     final_state = await workflow.ainvoke(initial_state)
     
-    # 4. Save Result
+    # 4. Save Results
     result = final_state.get("final_artifact")
     if result:
         output_dir = Path("results")
         output_dir.mkdir(exist_ok=True)
-        output_path = output_dir / f"{repo_name}_result.json"
         
+        # 4.1 Save individual MCP outputs
+        # Embedding
+        with open(output_dir / "embedding.json", "w", encoding="utf-8") as f:
+            json.dump(final_state.get("embeddings", []), f, indent=2, ensure_ascii=False)
+            
+        # Structural
+        with open(output_dir / "structural.json", "w", encoding="utf-8") as f:
+            json.dump(final_state.get("code_graph_raw", {}), f, indent=2, ensure_ascii=False)
+            
+        # Summarization
+        with open(output_dir / "summarization.json", "w", encoding="utf-8") as f:
+            json.dump(final_state.get("initial_summaries", []), f, indent=2, ensure_ascii=False)
+            
+        # Task Recommendation
+        with open(output_dir / "task_recommendation.json", "w", encoding="utf-8") as f:
+            json.dump(result.get("recommendations", []), f, indent=2, ensure_ascii=False)
+
+        # Legacy/Combined Result (Optional, keeping for backward compatibility if needed)
+        output_path = output_dir / f"{repo_name}_result.json"
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
         
-        print(f"✅ Analysis Complete! Result saved to: {output_path}")
+        print(f"Analysis Complete!")
+        print(f"   - Saved: {output_dir / 'embedding.json'}")
+        print(f"   - Saved: {output_dir / 'structural.json'}")
+        print(f"   - Saved: {output_dir / 'summarization.json'}")
+        print(f"   - Saved: {output_dir / 'task_recommendation.json'}")
         
         # Stats
         coverage = result.get("metrics", {}).get("coverage", {})
-        print(f"📊 Stats: {coverage.get('analyzed_files')} files analyzed ({coverage.get('percentage')}%)")
+        print(f"Stats: {coverage.get('analyzed_files')} files analyzed ({coverage.get('percentage')}%)")
         
     else:
-        print("❌ Analysis failed to produce an artifact.")
+        print("Analysis failed to produce an artifact.")
 
     # 5. Timing
     end_time = time.time()
     elapsed = end_time - start_time
-    print(f"⏱️ Total Execution Time: {elapsed:.2f}s")
+    print(f"Total Execution Time: {elapsed:.2f}s")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

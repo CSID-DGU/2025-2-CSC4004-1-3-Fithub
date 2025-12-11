@@ -6,6 +6,7 @@ from typing import Dict, List, Any, Optional
 import logging
 import os
 import json
+import random
 from huggingface_hub import InferenceClient
 try:
     from openai import OpenAI
@@ -29,6 +30,13 @@ class TaskRecommender:
                 self.model_id = Config.MODEL_LLM_OPENAI
             else:
                 logger.warning("OpenAI API Key missing. AI features disabled.")
+        elif self.provider == "upstage":
+            api_key = Config.UPSTAGE_API_KEY
+            if api_key and OpenAI:
+                self.client = OpenAI(api_key=api_key, base_url=Config.UPSTAGE_BASE_URL)
+                self.model_id = Config.MODEL_LLM_UPSTAGE
+            else:
+                logger.warning("Upstage API Key missing. AI features disabled.")
         else:
             token = Config.HF_API_KEY
             if token:
@@ -61,16 +69,11 @@ class TaskRecommender:
                 # Reliability Check (Grounding & Confidence)
                 for rec in ai_recommendations:
                     # Grounding Check: Exclude non-existent files
-                    if rec['target'] not in node_ids:
+                    # Allow 'General' or 'Project' targets for high-level tasks
+                    if rec['target'] not in node_ids and '/' in rec['target']: 
                         logger.warning(f"Filtered out hallucinated file: {rec['target']}")
                         continue
                     
-                    # Confidence Check: Exclude tasks with confidence < 70
-                    confidence = rec.get('confidence', 0)
-                    if confidence < 70:
-                        logger.warning(f"Filtered out low confidence task ({confidence}): {rec['target']}")
-                        continue
-                        
                     candidates.append(rec)
 
             except Exception as e:
@@ -92,8 +95,8 @@ class TaskRecommender:
                 if rec['target'] not in existing_targets:
                     # Assign category for rule-based tasks
                     rec['category'] = self._determine_category(rec['target'], rec.get('type'))
-                    # Assume 100 confidence for rule-based tasks
-                    rec['confidence'] = 100
+                    # Assume 80 confidence for rule-based tasks (Lower than high-confidence LLM)
+                    rec['confidence'] = 80
                     candidates.append(rec)
                     added_count += 1
                     existing_targets.add(rec['target'])
@@ -113,12 +116,21 @@ class TaskRecommender:
         else:
             final_list = self._sort_and_slice(candidates, top_k)
 
-        return final_list
+        # 5. Global Strict Filtering (Enforce User Constraint)
+        # Allowed: target, reason, priority, type, category, confidence, rank
+        allowed_final_keys = {"target", "reason", "priority", "type", "category", "confidence", "rank"}
+        sanitized_list = []
+        for rec in final_list:
+            sanitized = {k: v for k, v in rec.items() if k in allowed_final_keys}
+            sanitized_list.append(sanitized)
+
+        return sanitized_list
 
     def _sort_and_slice(self, recommendations: List[Dict[str, Any]], top_k: int) -> List[Dict[str, Any]]:
         """Fallback sorting and slicing logic."""
         priority_map = {"High": 0, "Medium": 1, "Low": 2}
-        recommendations.sort(key=lambda x: (priority_map.get(x['priority'], 3), -x.get('size', 0)))
+        # Sort by Priority then Confidence
+        recommendations.sort(key=lambda x: (priority_map.get(x['priority'], 3), -x.get('confidence', 0)))
         
         final_list = []
         for i, rec in enumerate(recommendations[:top_k]):
@@ -157,7 +169,7 @@ Return ONLY a JSON object with the list of selected IDs:
 }}
 """
         try:
-            if self.provider == "openai":
+            if self.provider == "openai" or self.provider == "upstage":
                 response = self.client.chat.completions.create(
                     model=self.model_id,
                     messages=[
@@ -197,6 +209,7 @@ Return ONLY a JSON object with the list of selected IDs:
                     final_list.append(rec)
                     rank += 1
             
+            # If LLM returned fewer, fill from remaining
             if len(final_list) < top_k:
                 remaining = [c for i, c in enumerate(candidates) if i not in selected_ids]
                 sorted_remaining = self._sort_and_slice(remaining, top_k - len(final_list))
@@ -254,7 +267,6 @@ Return ONLY a JSON object with the list of selected IDs:
                 summary = node.get("summary_text", "")
                 loc = node.get("loc", 10)
 
-                # Decoupled checks for broader coverage
                 if importance > 50:
                     recommendations.append({
                         "target": node['id'],
@@ -291,98 +303,95 @@ Return ONLY a JSON object with the list of selected IDs:
                         "type": "documentation_needed"
                     })
 
-                if complexity == 0 and loc < 5 and loc > 0:
-                     recommendations.append({
-                        "target": node['id'],
-                        "reason": "Minimal implementation detected.",
-                        "priority": "Medium",
-                        "related_entities": [],
-                        "type": "empty_implementation"
-                    })
-
         except Exception as e:
             logger.error(f"Rule-based recommendation failed: {e}")
         
         return recommendations
 
-    def _recommend_with_llm(self, analysis_results: Dict[str, Any], limit: int = 20) -> List[Dict[str, Any]]:
-        """Generate semantic task recommendations using LLM (Diversity Strategy)."""
-        import random
+    def _recommend_with_llm(self, analysis_results: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+        """Generate semantic task recommendations using LLM (Few-Shot Strategy)."""
         graph = analysis_results.get("graph") or {}
         context = (analysis_results.get("context") or {}).get("file_metadata", {})
         nodes = graph.get("nodes", [])
-
+        
         if not nodes:
             return []
 
-        # Diversity Strategy: 70% Top-Importance + 30% Random
-        total_slots = limit
-        top_slots = int(total_slots * 0.7)
-        random_slots = total_slots - top_slots
+        # 1. Prepare Context (Top 20 important files)
+        sorted_nodes = sorted(nodes, key=lambda x: x.get("importance", x.get("size", 0)), reverse=True)
+        top_nodes = sorted_nodes[:20]
 
-        sorted_nodes = sorted(nodes, key=lambda x: x.get("size", 0), reverse=True)
-        
-        selected_nodes = sorted_nodes[:top_slots]
-        remaining_nodes = sorted_nodes[top_slots:]
-
-        if remaining_nodes:
-            count = min(len(remaining_nodes), random_slots)
-            random_selection = random.sample(remaining_nodes, count)
-            selected_nodes.extend(random_selection)
-        
         file_summaries = []
-        for node in selected_nodes:
+        for node in top_nodes:
             fid = node['id']
-            meta = context.get(fid, {})
             summary = node.get('summary_text', 'No summary available')
-            layer = meta.get('layer', 'Unknown')
-            file_summaries.append(f"- File: {fid}\n  Layer: {layer}\n  Summary: {summary[:200]}...")
+            file_summaries.append(f"- File: {fid}\n  Summary: {summary[:300]}...")
 
         context_str = "\n".join(file_summaries)
 
-        prompt = f"""
-You are a Senior Technical Lead reviewing a codebase.
-Based on the following file summaries and structure, suggest up to {limit} high-impact maintenance tasks.
-Focus on: Refactoring, Security Improvements, Missing Documentation, or Feature Enhancements.
+        # 2. Few-Shot Prompt with User's Exact Examples
+        prompt = f'''
+You are a Senior Technical Lead. Review the code summaries and suggest exactly {limit} critical maintenance tasks.
+
+Output Style Requirement:
+- **target**: usage of filename.
+- **reason**: Must follow "Type: Description" format.
+- **priority**: High, Medium, or Low.
+- **type**: refactor, security, feature, fix, docs.
+- **category**: Backend, Frontend, AI, DevOps, Database, Common.
+- **confidence**: 0-100.
+
+STRICTLY IGNORE ANY OTHER FIELD. OUTPUT MUST NOT CONTAIN ANY ADDITIONAL KEYS.
+
+Reference Examples (Follow this style):
+[
+  {{
+    "target": "backend/src/server.ts",
+    "reason": "Security Alert: 'DATABASE_URL' is being logged to the console exposing credentials.",
+    "priority": "High",
+    "type": "security",
+    "category": "Backend",
+    "confidence": 98
+  }},
+  {{
+    "target": "agent/nodes.py",
+    "reason": "Refactor: 'nodes.py' is becoming a 'God Class'. Split into 'ingestion.py' and 'analysis.py'.",
+    "priority": "High",
+    "type": "refactor",
+    "category": "AI",
+    "confidence": 92
+  }}
+]
 
 Code Context:
 {context_str}
 
-Return ONLY a JSON object with this structure:
+Return ONLY a JSON object with a "recommendations" list containing exactly {limit} items:
 {{
-  "recommendations": [
-    {{
-      "target": "filename",
-      "reason": "Specific reason why this task is needed based on the summary.",
-      "priority": "High/Medium/Low",
-      "type": "refactor/security/docs/feature",
-      "category": "Frontend/Backend/AI/DevOps/Database/Common",
-      "confidence": 85
-    }}
-  ]
+  "recommendations": [ ... ]
 }}
-"""
+'''
         try:
-            if self.provider == "openai":
+            if self.provider == "openai" or self.provider == "upstage":
                 response = self.client.chat.completions.create(
                     model=self.model_id,
                     messages=[
-                        {"role": "system", "content": "You are a helpful software architect. Assign a confidence score (0-100) to each recommendation."},
+                        {"role": "system", "content": "You are a specific JSON generator. Output only valid JSON."},
                         {"role": "user", "content": prompt}
                     ],
                     response_format={"type": "json_object"},
-                    temperature=0.2
+                    temperature=0.1
                 )
                 content = response.choices[0].message.content
             else:
                 response = self.client.chat_completion(
                     messages=[
-                        {"role": "system", "content": "You are a helpful software architect. Assign a confidence score (0-100) to each recommendation."},
+                        {"role": "system", "content": "You are a specific JSON generator. Output only valid JSON."},
                         {"role": "user", "content": prompt}
                     ],
                     model=self.model_id,
-                    max_tokens=1000,
-                    temperature=0.2
+                    max_tokens=2000,
+                    temperature=0.1
                 )
                 content = response.choices[0].message.content
 
@@ -391,46 +400,32 @@ Return ONLY a JSON object with this structure:
                 clean_json = clean_json.replace("```json", "").replace("```", "")
             
             data = json.loads(clean_json)
-            return data.get("recommendations", [])
+            recommendations = data.get("recommendations", [])
+            
+            # Post-processing to strictly ensure only allowed keys
+            allowed_keys = {"target", "reason", "priority", "type", "category", "confidence"}
+            cleaned_recs = []
+            for rec in recommendations:
+                cleaned = {k: v for k, v in rec.items() if k in allowed_keys}
+                cleaned_recs.append(cleaned)
+                
+            return cleaned_recs
 
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
             return []
 
     def _determine_category(self, file_path: str, task_type: Optional[str] = None) -> str:
-        """파일 경로와 작업 유형을 기반으로 6가지 카테고리 결정."""
+        """Category logic."""
         lower_path = file_path.lower()
-        
-        # 1. AI
-        if any(x in lower_path for x in ["mcp/", "agent/", "models/", "torch", "openai", "ai/", "huggingface"]):
-            return "AI"
-        
-        # 2. DevOps
-        if any(x in lower_path for x in ["docker", "k8s", "kubernetes", "jenkins", ".yml", ".yaml", "ci/cd", "pipeline"]):
-            return "DevOps"
-            
-        # 3. Database
-        if any(x in lower_path for x in ["prisma", "sql", "migration", "db/", "database", "entity", "schema"]):
-            return "Database"
-
-        # 4. Frontend
-        if any(lower_path.endswith(ext) for ext in [".tsx", ".jsx", ".css", ".html", ".scss", ".vue", ".svelte"]):
-            return "Frontend"
-        if "frontend" in lower_path or "client" in lower_path or "ui/" in lower_path or "components/" in lower_path:
-            return "Frontend"
-
-        # 5. Backend
-        if any(lower_path.endswith(ext) for ext in [".py", ".go", ".java", ".rb", ".php", ".cs"]):
-            return "Backend"
-        if "backend" in lower_path or "server" in lower_path or "api" in lower_path or "controller" in lower_path:
-            return "Backend"
-        if task_type == "architecture_violation":
-            return "Backend"
-
-        # 6. Common (Default)
-        if any(x in lower_path for x in ["utils", "shared", "config", "common", "lib"]):
-            return "Common"
-            
+        if any(x in lower_path for x in ["mcp/", "agent/", "models/", "torch", "openai", "ai/", "huggingface"]): return "AI"
+        if any(x in lower_path for x in ["docker", "k8s", "kubernetes", "jenkins", ".yml", ".yaml", "ci/cd"]): return "DevOps"
+        if any(x in lower_path for x in ["prisma", "sql", "migration", "db/", "database", "entity", "schema"]): return "Database"
+        if any(lower_path.endswith(ext) for ext in [".tsx", ".jsx", ".css", ".html", ".scss", ".vue"]): return "Frontend"
+        if "frontend" in lower_path or "client" in lower_path or "ui/" in lower_path: return "Frontend"
+        if any(lower_path.endswith(ext) for ext in [".py", ".go", ".java", ".rb", ".php", ".cs"]): return "Backend"
+        if "backend" in lower_path or "server" in lower_path: return "Backend"
+        if any(x in lower_path for x in ["utils", "shared", "config", "common", "lib"]): return "Common"
         return "Common"
 
 def create_recommender(device=None) -> TaskRecommender:

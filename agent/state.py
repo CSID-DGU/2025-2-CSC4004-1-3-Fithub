@@ -41,7 +41,7 @@ class AgentState(TypedDict, total=False):
     end_time: float
 
 def log_node_execution(state: AgentState, node_name: str, status: str, duration: float):
-    if "node_execution_log" not in state:
+    if state.get("node_execution_log") is None:
         state["node_execution_log"] = []
     state["node_execution_log"].append({
         "node": node_name, "status": status, "duration": duration

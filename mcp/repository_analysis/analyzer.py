@@ -32,7 +32,16 @@ class RepositoryAnalyzer:
                 self.model_id = Config.MODEL_LLM_OPENAI
                 logger.info(f"Initialized OpenAI client with model {self.model_id}")
             else:
-                logger.warning("OpenAI API Key missing or openai package not installed. OpenAI features will be disabled.")
+                logger.warning("OpenAI API Key missing. OpenAI features will be disabled.")
+                self.client = None
+        elif self.provider == "upstage":
+            api_key = Config.UPSTAGE_API_KEY
+            if api_key and OpenAI:
+                self.client = OpenAI(api_key=api_key, base_url=Config.UPSTAGE_BASE_URL)
+                self.model_id = Config.MODEL_LLM_UPSTAGE
+                logger.info(f"Initialized Upstage client with model {self.model_id}")
+            else:
+                logger.warning("Upstage API Key missing. Upstage features will be disabled.")
                 self.client = None
         else:
             # Default: Hugging Face
@@ -86,7 +95,7 @@ class RepositoryAnalyzer:
         """
         Mistral-7B를 사용하여 파일들의 역할(Domain, Layer)과 논리적 관계를 분석합니다.
         """
-        if self.provider == "openai":
+        if self.provider == "openai" or self.provider == "upstage":
             return self._analyze_with_openai(nodes)
         
         # 프롬프트 구성을 위한 요약 정보 추출 (최대 20개 파일만 - 토큰 제한 고려)

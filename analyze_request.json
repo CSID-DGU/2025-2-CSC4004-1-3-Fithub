@@ -1,0 +1,13 @@
+{
+    "repo": {
+        "repo_id": "express-hello-world-test",
+        "uri": "https://github.com/render-examples/express-hello-world.git",
+        "source": "git",
+        "branch": "main"
+    },
+    "options": {
+        "summary": "llm",
+        "graph": "full",
+        "metrics": "full"
+    }
+}

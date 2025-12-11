@@ -17,9 +17,18 @@
     "file_metadata": {},
     "logical_edges": []
   },
-  "recommendations": [],
+  "recommendations": [
+    {
+      "target": "ROOT",
+      "reason": "Missing documentation/summary.",
+      "priority": "Low",
+      "type": "documentation_needed",
+      "category": "Common",
+      "confidence": 80,
+      "rank": 1
+    }
+  ],
   "metrics": {
-    "consistency_score": 0.6,
     "coverage": {
       "total_files": 1,
       "analyzed_files": 0,

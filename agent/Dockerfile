@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+
 WORKDIR /app
 
 # 캐시 활용을 위해 requirements 먼저 복사

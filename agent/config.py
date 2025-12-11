@@ -25,7 +25,7 @@ class Config:
     LOCAL_MODEL_DIR = "/Users/iyeonglag/PycharmProjects/2025-2-CSC4004-1-3-Fithub/models/RepoGraph"
 
     # [Retry Strategy]
-    MAX_RETRIES = 1
+    MAX_RETRIES = 0
     RETRY_DELAY = 1.0 # seconds
     MAX_ANALYSIS_FILES = 50 # Reduced for testing (was 10000)
 
@@ -60,4 +60,11 @@ class Config:
     # [Feature Flags]
     USE_LOCAL_LLM = True # Force Local Mistral/Gemma
     USE_LOCAL_SUMMARIZER = True # Force Local CodeT5
+    USE_LOCAL_LLM = True # Force Local Mistral/Gemma
+    USE_LOCAL_SUMMARIZER = True # Force Local CodeT5
     USE_ROLE_BASED_ENSEMBLE = False # Disable API-heavy features
+
+    # --- Upstage (Solar Pro 2) ---
+    UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY")
+    UPSTAGE_BASE_URL = "https://api.upstage.ai/v1/solar"
+    MODEL_LLM_UPSTAGE = "solar-pro" # Alias for Solar Pro 2

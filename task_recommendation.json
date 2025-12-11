@@ -1,0 +1,94 @@
+{
+  "recommendations": [
+    {
+      "target": "analyze_github.py",
+      "reason": "Security: Missing rate-limiting/error handling for GitHub API calls.",
+      "priority": "High",
+      "type": "security",
+      "category": "Backend",
+      "confidence": 90,
+      "rank": 1
+    },
+    {
+      "target": "analyze_github.py::clone_repo",
+      "reason": "Fix: Potential insecure repo cloning without path sanitization.",
+      "priority": "High",
+      "type": "fix",
+      "category": "Backend",
+      "confidence": 88,
+      "rank": 2
+    },
+    {
+      "target": "agent/config.py",
+      "reason": "Security: Configuration management lacks environment variable validation.",
+      "priority": "High",
+      "type": "security",
+      "category": "Backend",
+      "confidence": 89,
+      "rank": 3
+    },
+    {
+      "target": "agent/schemas.py",
+      "reason": "Security: Pydantic schemas lack input validation for malicious payloads.",
+      "priority": "High",
+      "type": "security",
+      "category": "Backend",
+      "confidence": 91,
+      "rank": 4
+    },
+    {
+      "target": "agent/schemas.py::RepoInput",
+      "reason": "Fix: Missing required fields validation for repository input schema.",
+      "priority": "High",
+      "type": "fix",
+      "category": "Backend",
+      "confidence": 87,
+      "rank": 5
+    },
+    {
+      "target": "agent/schemas.py::AnalyzeRequest",
+      "reason": "Security: Request schema allows overly permissive file path inputs.",
+      "priority": "High",
+      "type": "security",
+      "category": "Backend",
+      "confidence": 89,
+      "rank": 6
+    },
+    {
+      "target": "verify_full_graph.py",
+      "reason": "Refactor: Large verification file needs modularization into test/data layers.",
+      "priority": "Medium",
+      "type": "refactor",
+      "category": "Common",
+      "confidence": 82,
+      "rank": 7
+    },
+    {
+      "target": "agent/edges.py::check_quality",
+      "reason": "Performance: Quality checks perform redundant calculations on large graphs.",
+      "priority": "Medium",
+      "type": "refactor",
+      "category": "AI",
+      "confidence": 84,
+      "rank": 8
+    },
+    {
+      "target": "agent/schemas.py::AnalyzeResponse",
+      "reason": "Refactor: Response schema should implement standardized error format.",
+      "priority": "Medium",
+      "type": "refactor",
+      "category": "Backend",
+      "confidence": 82,
+      "rank": 9
+    },
+    {
+      "target": "agent/config.py::Config",
+      "reason": "Refactor: Config class should implement singleton pattern for consistency.",
+      "priority": "Medium",
+      "type": "refactor",
+      "category": "Backend",
+      "confidence": 81,
+      "rank": 10
+    }
+  ]
+}

@@ -317,6 +317,10 @@ class CodeSummarizer:
 
         is_chat_model = "instruct" in model_id.lower() or "chat" in model_id.lower() or "qwen" in model_id.lower()
 
+        if self.client is None:
+             logger.warning(f"HF Client is None. Skipping API call for {model_id}. Using Local/Dummy.")
+             return self._get_dummy_summary(prompt_type)
+
         for attempt in range(max_retries):
             try:
                 # Throttling

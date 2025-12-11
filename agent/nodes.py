@@ -5,6 +5,7 @@ Core logic implementation for each workflow node.
 import logging
 import time
 import shutil
+import subprocess
 import networkx as nx
 import numpy as np
 from pathlib import Path
@@ -31,13 +32,34 @@ async def fetch_from_backend_node(state: AgentState) -> Dict[str, Any]:
         local_path = repo_input.get("local_path")
         run_id = state.get("run_id", "default")
 
+        if run_id == "default":
+             run_id = str(uuid.uuid4()) # fallback
+
         # 임시 저장소 경로 설정 및 초기화
         temp_dir = Path(Config.TEMP_DIR) / run_id
         if temp_dir.exists():
             shutil.rmtree(temp_dir)
         temp_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Fetching files for repo {repo_id} into {temp_dir}...")
+        logger.info(f"Fetching files into {temp_dir}...")
+        
+        # [Option 0] Git Clone (Priority)
+        uri = repo_input.get("uri")
+        if uri:
+            logger.info(f"Cloning from {uri}...")
+            branch = repo_input.get("branch", "main")
+            try:
+                subprocess.check_call(["git", "clone", "--depth", "1", "--branch", branch, uri, str(temp_dir)])
+                # remove .git to save space/confusion
+                git_dir = temp_dir / ".git"
+                if git_dir.exists():
+                    shutil.rmtree(git_dir)
+                
+                log_node_execution(state, "ingest", "success", time.time() - start_time)
+                return {"repo_path": str(temp_dir)}
+            except Exception as e:
+                logger.error(f"Git clone failed: {e}")
+                return {"error_message": f"Git clone failed: {e}"}
 
         # [Option 1] Local Path Ingestion (For Testing)
         if local_path:
@@ -314,7 +336,7 @@ async def synthesize_node(state: AgentState) -> Dict[str, Any]:
             "graph": state.get("final_graph_json"),
             "context": state.get("context_metadata")
         }
-        tasks = rec.recommend(analysis_res)
+        tasks = rec.recommend_tasks(analysis_res)
 
         # Coverage Statistics
         total_files_found = state.get("context_metadata", {}).get("statistics", {}).get("total_files", 0)

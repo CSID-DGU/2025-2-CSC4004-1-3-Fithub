@@ -9,7 +9,10 @@ from datetime import datetime
 # --- Requests ---
 
 class RepoInput(BaseModel):
-    repo_id: str = Field(..., description="Backend Repository ID")
+    repo_id: Optional[str] = Field(None, description="Backend Repository ID")
+    uri: Optional[str] = Field(None, description="Git Repository URI")
+    source: Optional[str] = Field("git", description="Source type (git, local)")
+    branch: Optional[str] = Field("main", description="Branch name")
     name: Optional[str] = Field(None, description="Repository Name")
     local_path: Optional[str] = Field(None, description="Local Path for Testing")
 

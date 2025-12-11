@@ -27,6 +27,7 @@ class RecommendationRequest(BaseModel):
     """추천 요청."""
     analysis_results: Dict[str, Any]
     top_k: int = 10
+    selected_labels: Optional[List[str]] = None
 
 
 class Recommendation(BaseModel):
@@ -73,7 +74,8 @@ async def recommend_tasks(request: RecommendationRequest) -> RecommendationRespo
     try:
         recommendations = recommender.recommend_tasks(
             request.analysis_results,
-            request.top_k
+            request.top_k,
+            request.selected_labels
         )
 
         return RecommendationResponse(

@@ -24,10 +24,13 @@ class Config:
     TEMP_DIR = "./temp_repos"
     LOCAL_MODEL_DIR = "/Users/iyeonglag/PycharmProjects/2025-2-CSC4004-1-3-Fithub/models/RepoGraph"
 
-    # --- Settings ---
-    MAX_RETRIES = 2
-    TIMEOUT = 60.0
+    # [Retry Strategy]
+    MAX_RETRIES = 1
+    RETRY_DELAY = 1.0 # seconds
     MAX_ANALYSIS_FILES = 50 # Reduced for testing (was 10000)
+
+    # --- Settings ---
+    TIMEOUT = 60.0
 
     # --- Local Mode Settings ---
     USE_LOCAL_LLM = True # Use Local Mistral/Chat for Analysis (Rule-based Fallback effectively)
@@ -54,5 +57,7 @@ class Config:
     MODEL_SUMMARIZER_INTENT = "Qwen/Qwen2.5-Coder-32B-Instruct"
     MODEL_SUMMARIZER_STRUCTURE = "Qwen/Qwen2.5-Coder-32B-Instruct"
     
-    # Flag to enable the new Prompt-based dispatch logic
-    USE_ROLE_BASED_ENSEMBLE = True
+    # [Feature Flags]
+    USE_LOCAL_LLM = True # Force Local Mistral/Gemma
+    USE_LOCAL_SUMMARIZER = True # Force Local CodeT5
+    USE_ROLE_BASED_ENSEMBLE = False # Disable API-heavy features

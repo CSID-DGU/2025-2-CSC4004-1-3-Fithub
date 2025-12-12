@@ -4,42 +4,60 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+
+// Route imports
 import githubRoutes from "./routes/githubRoutes";
-import { errorHandler } from "./middleware/errorHandler";
 import projectRoutes from "./routes/projectRoutes";
 import analysisRoutes from "./routes/analysisRoutes";
-import summaryRoutes from "./routes/summaryRoutes";
-import taskRoutes from "./routes/taskRoutes";
+import recommendationRoutes from "./routes/recommendationRoutes";
+
 import userRoutes from "./routes/userRoutes";
 import authRoutes from "./routes/authRoutes";
-import YAML from "yamljs";
 
+
+
+// Middleware
+import { errorHandler } from "./middleware/errorHandler";
+
+// BigInt JSON 대응
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
 
 const app = express();
-app.use(cors({
-  origin: "*",   
-  credentials: true
-}));
 
+// CORS 설정
+app.use(
+  cors({
+    origin: "*",
+    credentials: true,
+  })
+);
+
+// 보안 헤더
 app.use(helmet());
+
+// JSON 파싱
 app.use(express.json());
 
-app.use("/auth", authRoutes);                 
-app.use("/projects", projectRoutes);  
-app.use("/users",userRoutes);      
+// 라우터 등록
+app.use("/auth", authRoutes);
+app.use("/projects", projectRoutes);
+app.use("/users", userRoutes);
 app.use("/analysis", analysisRoutes);
-app.use("/summary",summaryRoutes);
-app.use("/task",taskRoutes);
 app.use("/github", githubRoutes);
+app.use("/recommendations", recommendationRoutes);
+
+
+// 에러 핸들러
 app.use(errorHandler);
 
+// 헬스 체크
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+// 서버 실행
 const PORT = process.env.PORT || 4000;
 
 app.listen(PORT, () => {

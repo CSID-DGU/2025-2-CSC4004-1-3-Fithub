@@ -7,15 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//유저(github 0auth 연동 로그인)
+/* ============================
+   User
+============================= */
 model User {
-  id             Int              @id @default(autoincrement())
-  githubId       String           @unique
-  login          String
-  avatarUrl      String?
-  name           String?
-  email          String?
-  createdAt      DateTime         @default(now())
+  id               Int              @id @default(autoincrement())
+  githubId         String           @unique
+  login            String
+  avatarUrl        String?
+  name             String?
+  email            String?
+  createdAt        DateTime         @default(now())
 
   githubAccessToken String?
   ownedProjects     Project[]        @relation("UserOwnedProjects")
@@ -23,7 +25,9 @@ model User {
   tasks             Task[]
 }
 
-//GIthub Repository
+/* ============================
+   GitHub Repository
+============================= */
 model repository {
   repo_id        BigInt    @id
   name           String?   @db.VarChar(255)
@@ -38,22 +42,26 @@ model repository {
   pushed_at      DateTime? @db.Timestamp(6)
   owner_login    String?   @db.VarChar(255)
 
-  commits commit[]
-  files   file[]
-  issues  issue[]
-  pulls   pull[]
+  commits        commit[]
+  files          file[]
+  issues         issue[]
+  pulls          pull[]
 
   projectRepositories ProjectRepository[]
-  summaries   Summary[]
   tasks               Task[]
+
+  graphs             Graph[]
+  recommendations    Recommendation[]
 }
 
-//Commit 정보
+/* ============================
+   Commit / File / Issue / PR
+============================= */
 model commit {
   commit_sha   String    @id @db.VarChar(255)
   repo_id      BigInt?
   author_name  String?   @db.VarChar(255)
-  author_email String?   @db.VarChar(255)   
+  author_email String?   @db.VarChar(255)
   date         DateTime? @db.Timestamp(6)
   message      String?
   parent_sha   String?   @db.VarChar(255)
@@ -61,7 +69,6 @@ model commit {
   repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
 }
 
-//file 정보
 model file {
   file_id String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   repo_id BigInt?
@@ -74,7 +81,6 @@ model file {
   repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
 }
 
-//issue 정보
 model issue {
   issue_id     BigInt      @id
   repo_id      BigInt?
@@ -89,7 +95,6 @@ model issue {
   repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
 }
 
-//pr 정보
 model pull {
   pull_id    BigInt       @id
   repo_id    BigInt?
@@ -101,21 +106,22 @@ model pull {
   repository repository? @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
 }
 
-//프로젝트
+/* ============================
+   Project / Member / Repo
+============================= */
 model Project {
   id          Int      @id @default(autoincrement())
   name        String
   description String?
   ownerId     Int 
 
-  owner   User    @relation("UserOwnedProjects", fields: [ownerId], references: [id], onDelete: Cascade)
-  members ProjectMember[]
-  repos   ProjectRepository[]
-  tasks     Task[]
-  createdAt DateTime @default(now())
+  owner        User            @relation("UserOwnedProjects", fields: [ownerId], references: [id], onDelete: Cascade)
+  members      ProjectMember[]
+  repos        ProjectRepository[]
+  tasks        Task[]
+  createdAt    DateTime @default(now())
 }
 
-//프로젝트 내에 생성(연결)하는 github repository
 model ProjectRepository {
   id        Int    @id @default(autoincrement())
   projectId Int
@@ -125,7 +131,6 @@ model ProjectRepository {
   repo    repository @relation(fields: [repo_id], references: [repo_id], onDelete: Cascade)
 }
 
-//프로젝트 내의 멤버
 model ProjectMember {
   id        Int      @id @default(autoincrement())
   projectId Int
@@ -136,7 +141,6 @@ model ProjectMember {
   user    User    @relation("UserProjectMembers", fields: [userId], references: [id], onDelete: Cascade)
 }
 
-//Role enum table
 enum Role {
   FRONTEND
   BACKEND
@@ -146,17 +150,15 @@ enum Role {
   COMMON
 }
 
-//task status enum table
 enum TaskStatus {
   UNDONE
   IN_PROGRESS
   DONE
 }
 
-/*
-  Task, Summary - AI 서버가 결과값으로 도출한 json 파일을 파싱하여 db에 저장
-*/
-
+/* ============================
+   Task (AI 작업)
+============================= */
 model Task {
   id             Int        @id @default(autoincrement())
   projectId      Int
@@ -185,30 +187,70 @@ model Task {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
-model Summary {
-  id        Int        @id @default(autoincrement())
-  runId     String    @unique
-  repoId    BigInt
-  repository repository @relation(fields: [repoId], references: [repo_id])
 
-  items     SummaryItem[]
+/* ============================
+   AI Graph Model
+============================= */
+
+model Graph {
+  id        Int      @id @default(autoincrement())
+  runId     String
+  repoId    BigInt
+  repository repository @relation(fields: [repoId], references: [repo_id], onDelete: Cascade)
+
+  nodes     GraphNode[]
+  edges     GraphEdge[]
+
+  context   Json?
+  metrics   Json?
   createdAt DateTime @default(now())
 }
 
+model GraphNode {
+  id             Int    @id @default(autoincrement())
+  graphId        Int
+  nodeId         String
+  label          String?
+  type           String?
+  parent         String?
+  domain         String?
+  importance     Float?
 
-model SummaryItem {
-  id              Int        @id @default(autoincrement())
-  summaryId       Int
+  summary        String?
+  summaryDetails Json?
+  context        Json?
 
-  codeId          String?
-  text            String?
-  unifiedSummary  String?
-  level           String?
-  qualityScore    Float?
+  graph Graph @relation(fields: [graphId], references: [id], onDelete: Cascade)
+}
 
-  logic           String?
-  intent          String?
-  structure       String?
+model GraphEdge {
+  id      Int    @id @default(autoincrement())
+  graphId Int
+  source  String
+  target  String
+  type    String?
 
-  summary Summary @relation(fields: [summaryId], references: [id], onDelete: Cascade)
+  graph Graph @relation(fields: [graphId], references: [id], onDelete: Cascade)
+}
+
+/* ============================
+   Recommendations
+============================= */
+model Recommendation {
+  id           Int      @id @default(autoincrement())
+  runId        String
+  repoId       BigInt
+  repository   repository @relation(fields: [repoId], references: [repo_id], onDelete: Cascade)
+
+  target       String?
+  reason       String?
+  priority     String?
+  category     String?
+  type         String?
+  confidence   Int?
+  rank         Int?
+
+  relatedNodes Json?
+
+  createdAt    DateTime @default(now())
 }

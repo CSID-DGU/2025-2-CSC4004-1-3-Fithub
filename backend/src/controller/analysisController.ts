@@ -1,13 +1,10 @@
 import axios from "axios";
-import fs from "fs";
-import path from "path";
 import { Request, Response } from "express";
-import { summaryService } from "../github/services/summaryService";
+import { recommendationService } from "../github/services/recommendationService";
 
 const AI_AGENT_URL = process.env.AI_AGENT_URL || "http://localhost:8000";
 
-
-// POST /analysis/run
+// 분석 시작
 export const startFullAnalysis = async (req: Request, res: Response) => {
   console.log("START ANALYSIS");
 
@@ -32,45 +29,34 @@ export const startFullAnalysis = async (req: Request, res: Response) => {
 };
 
 
-
-// GET /analysis/status/:runId
+// 분석 상태 체크
 export const getAnalysisStatus = async (req: Request, res: Response) => {
   console.log("CHECK STATUS");
 
   try {
     const { runId } = req.params;
 
-    const baseDir = path.join(__dirname, "../../../results", runId);
-    const structural = path.join(baseDir, "structural.json");
-    const summary = path.join(baseDir, "summarization.json");
+    const aiRes = await axios.get(`${AI_AGENT_URL}/result/${runId}`);
+    const aiData = aiRes.data;
 
-    const hasStructural = fs.existsSync(structural);
-    const hasSummary = fs.existsSync(summary);
+    console.log("[STATUS CHECK] agent status =", aiData.status);
 
-    console.log("[STATUS CHECK]", { hasStructural, hasSummary });
-
-    if (hasStructural && hasSummary) {
+    if (aiData.status === "completed") {
       return res.json({ status: "completed" });
     }
 
-    return res.json({
-      status: "processing",
-      structural: hasStructural,
-      summarization: hasSummary
-    });
+    return res.json({ status: "processing" });
 
-  } catch (err: any) {
-    console.error("ERROR getAnalysisStatus:", err.message);
-    return res.status(500).json({ error: "Failed to check status" });
+  } catch (err) {
+    console.error("ERROR getAnalysisStatus:", (err as any).message);
+    return res.json({ status: "processing" });
   }
 };
 
 
-
-// GET /analysis/result/:runId
-// GET /analysis/result/:runId
+// 분석 결과 조회
 export const getAnalysisResult = async (req: Request, res: Response) => {
-  console.log("LOAD RESULT");
+  console.log("LOAD RESULT (GRAPH: RAW, RECO: SAVE)");
 
   try {
     const { runId } = req.params;
@@ -84,55 +70,37 @@ export const getAnalysisResult = async (req: Request, res: Response) => {
 
     console.log("[AI REQUEST] GET /result/" + runId);
 
-    // 1) 상태는 Agent에게 확인 (completed 여부 판단만)
     const aiRes = await axios.get(`${AI_AGENT_URL}/result/${runId}`);
     const aiData = aiRes.data;
 
-    console.log("[AI RESPONSE]", aiData.status);
+    console.log("[AI RESPONSE STATUS]", aiData.status);
 
     if (aiData.status !== "completed") {
       return res.json({ status: "processing" });
     }
 
-    // -----------------------------------------
-    // 2) 백엔드가 직접 JSON 파일 읽기
-    // -----------------------------------------
-    const baseDir = path.join(process.cwd(), "results", runId);
+    const result = aiData.result;
 
-    const structuralPath = path.join(baseDir, "structural.json");
-    const summaryPath = path.join(baseDir, "summarization.json");
-
-    console.log("[READ FILES FROM]", baseDir);
-
-    if (!fs.existsSync(structuralPath) || !fs.existsSync(summaryPath)) {
-      console.log("[FILE MISSING]");
-      return res.json({ status: "processing", message: "Files not ready" });
+    if (!result) {
+      return res.json({ status: "processing", message: "Result not ready" });
     }
 
-    // 파일을 실제로 읽어오기
-    const structural = JSON.parse(fs.readFileSync(structuralPath, "utf-8"));
-    const summarizationArray = JSON.parse(fs.readFileSync(summaryPath, "utf-8"));
+    if (Array.isArray(result.recommendations)) {
+      console.log("[RECOMMENDATION SAVE]");
+      await recommendationService.saveRecommendations(
+        runId,
+        repoIdBigInt,
+        result.recommendations
+      );
+    }
 
-    console.log("[FILE LOADED] structural + summarization");
-
-    // -----------------------------------------
-    // 3) DB 저장
-    // -----------------------------------------
-    console.log("[SAVE SUMMARY]");
-    await summaryService.saveSummaryFromAI(runId, repoIdBigInt, summarizationArray);
-
-    const summaryFromDB = await summaryService.getSummaryByRunId(runId);
-
-    // -----------------------------------------
-    // 4) 최종 응답
-    // -----------------------------------------
-    console.log("[RESULT READY]", { runId });
+    console.log("[RETURN RAW GRAPH + RECOMMENDATIONS]");
 
     return res.json({
       runId,
       status: "completed",
-      structural,
-      summary: summaryFromDB,
+      graph: result.graph,             
+      recommendations: result.recommendations || []
     });
 
   } catch (err: any) {
